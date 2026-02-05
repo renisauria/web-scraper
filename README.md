@@ -59,6 +59,17 @@ npm run dev
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+### Temporary Password Gate (optional)
+
+To keep the app private during development, you can enable HTTP Basic Auth for all routes using the built‑in middleware. Set both of these in `.env.local`:
+
+```env
+BASIC_AUTH_USER=admin
+BASIC_AUTH_PASSWORD=change-me
+```
+
+Leave either value empty to disable the gate. When enabled, the browser will prompt for credentials and reuse them for API requests as well.
+
 ## Usage
 
 1. **Create a Project** - Click "New Project" and enter the website URL you want to analyze
