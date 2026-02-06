@@ -220,12 +220,10 @@ export default function PageDetailView({
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1 min-w-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight truncate">
-              {page.title || "Untitled Page"}
-            </h1>
-            <Badge variant="secondary">{formatVersionDate(page.createdAt)}</Badge>
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight truncate">
+            {page.title || "Untitled Page"}
+          </h1>
+          <Badge variant="secondary">{formatVersionDate(page.createdAt)}</Badge>
           <div className="flex items-center gap-2">
             <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
             <a
