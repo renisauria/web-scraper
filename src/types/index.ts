@@ -19,7 +19,9 @@ export interface Project {
   url: string;
   clientName: string | null;
   clientProblems: string | null;
-  clientGoals: string | null;
+  competitorAnalysis: string | null;
+  projectRequirements: string | null;
+  clientNotes: string | null;
   crawlJobId: string | null;
   status: ProjectStatus;
   createdAt: Date;

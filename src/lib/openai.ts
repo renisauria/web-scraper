@@ -216,7 +216,7 @@ export async function generateRecommendedSitemap(
   context: {
     clientName: string | null;
     clientProblems: string | null;
-    clientGoals: string | null;
+    competitorAnalysis: string | null;
     projectUrl: string;
   }
 ): Promise<Record<string, unknown>> {
@@ -266,7 +266,7 @@ Important rules:
   let userPrompt = `Current website: ${context.projectUrl}\n\n`;
   if (context.clientName) userPrompt += `Client: ${context.clientName}\n`;
   if (context.clientProblems) userPrompt += `Client Problems: ${context.clientProblems}\n`;
-  if (context.clientGoals) userPrompt += `Client Goals: ${context.clientGoals}\n`;
+  if (context.competitorAnalysis) userPrompt += `Competitor Analysis & Desired Features: ${context.competitorAnalysis}\n`;
   userPrompt += `\nCurrent Sitemap Structure:\n${JSON.stringify(currentSitemap, null, 2)}\n\n`;
   userPrompt += `Page Content:\n${pageContent}`;
 

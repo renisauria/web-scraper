@@ -129,7 +129,7 @@ export default function ProjectsPage() {
             <Card key={project.id} className="group relative">
               <Link href={`/projects/${project.id}`}>
                 <CardHeader>
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between pr-8">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                         <Globe className="h-5 w-5 text-primary" />

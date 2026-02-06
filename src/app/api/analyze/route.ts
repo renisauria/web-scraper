@@ -72,10 +72,10 @@ export async function POST(request: NextRequest) {
     if (proj.clientProblems) {
       additionalContext += `\nClient Problems: ${proj.clientProblems}`;
     }
-    if (proj.clientGoals) {
-      additionalContext += `\nClient Goals: ${proj.clientGoals}`;
+    if (proj.competitorAnalysis) {
+      additionalContext += `\nCompetitor Analysis & Desired Features: ${proj.competitorAnalysis}`;
     }
-    if (proj.clientProblems || proj.clientGoals) {
+    if (proj.clientProblems || proj.competitorAnalysis) {
       additionalContext += `\n\nPlease specifically address the client's stated problems and goals in your analysis.`;
     }
 

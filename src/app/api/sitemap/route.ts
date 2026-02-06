@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
         {
           clientName: proj.clientName,
           clientProblems: proj.clientProblems,
-          clientGoals: proj.clientGoals,
+          competitorAnalysis: proj.competitorAnalysis,
           projectUrl: proj.url,
         }
       );

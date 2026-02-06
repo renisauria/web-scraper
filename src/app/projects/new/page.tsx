@@ -26,7 +26,7 @@ export default function NewProjectPage() {
     url: "",
     clientName: "",
     clientProblems: "",
-    clientGoals: "",
+    competitorAnalysis: "",
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -151,18 +151,18 @@ export default function NewProjectPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="clientGoals">Main Goals (Optional)</Label>
+              <Label htmlFor="competitorAnalysis">Competitor Analysis & Desired Features (Optional)</Label>
               <Textarea
-                id="clientGoals"
-                placeholder="What does the client want to achieve with their website..."
-                value={formData.clientGoals}
+                id="competitorAnalysis"
+                placeholder="Competitor insights, desired features, and functionality goals..."
+                value={formData.competitorAnalysis}
                 onChange={(e) =>
-                  setFormData({ ...formData, clientGoals: e.target.value })
+                  setFormData({ ...formData, competitorAnalysis: e.target.value })
                 }
                 rows={3}
               />
               <p className="text-sm text-muted-foreground">
-                Adding goals helps the AI tailor its analysis to specific objectives
+                Adding competitor analysis helps the AI tailor its recommendations
               </p>
             </div>
 

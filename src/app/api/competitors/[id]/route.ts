@@ -11,6 +11,7 @@ const updateCompetitorSchema = z.object({
   preferredFeature: z.string().optional(),
   preferredFeatureUrl: z.string().url().optional().or(z.literal("")),
   notes: z.string().optional(),
+  referenceImages: z.array(z.string()).optional(),
 });
 
 export async function PATCH(
@@ -43,6 +44,7 @@ export async function PATCH(
     if (data.preferredFeature !== undefined) updates.preferredFeature = data.preferredFeature || null;
     if (data.preferredFeatureUrl !== undefined) updates.preferredFeatureUrl = data.preferredFeatureUrl || null;
     if (data.notes !== undefined) updates.notes = data.notes || null;
+    if (data.referenceImages !== undefined) updates.referenceImages = data.referenceImages;
 
     if (Object.keys(updates).length > 0) {
       await db

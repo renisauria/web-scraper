@@ -40,9 +40,13 @@ import {
   RefreshCw,
   Trash2,
   Upload,
+  ClipboardList,
+  StickyNote,
 } from "lucide-react";
 import type { Project, Page, Analysis, Competitor, CompetitorType } from "@/types";
 import { AnalysisModal } from "@/components/analysis-modal";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
+import { MarkdownViewer } from "@/components/ui/markdown-viewer";
 
 interface ProjectData {
   project: Project;
@@ -67,7 +71,7 @@ export default function ProjectDetailPage({
   const [singleUrl, setSingleUrl] = useState("");
   const [scrapingSingle, setScrapingSingle] = useState(false);
   const [editingContext, setEditingContext] = useState(false);
-  const [contextForm, setContextForm] = useState({ clientProblems: "", clientGoals: "" });
+  const [contextForm, setContextForm] = useState({ clientProblems: "", competitorAnalysis: "", projectRequirements: "", clientNotes: "" });
   const [savingContext, setSavingContext] = useState(false);
   const [addingCompetitor, setAddingCompetitor] = useState(false);
   const [competitorForm, setCompetitorForm] = useState({ name: "", url: "", type: "competitor" as CompetitorType, preferredFeature: "", preferredFeatureUrl: "", notes: "" });
@@ -78,6 +82,7 @@ export default function ProjectDetailPage({
   const [editingCompetitor, setEditingCompetitor] = useState(false);
   const [competitorEditForm, setCompetitorEditForm] = useState({ name: "", url: "", type: "competitor" as CompetitorType, preferredFeature: "", preferredFeatureUrl: "", notes: "" });
   const [savingCompetitorEdit, setSavingCompetitorEdit] = useState(false);
+  const [editReferenceImages, setEditReferenceImages] = useState<string[]>([]);
   const [viewingScreenshot, setViewingScreenshot] = useState<{ url: string; title: string } | null>(null);
 
   const fetchProject = useCallback(async () => {
@@ -219,7 +224,9 @@ export default function ProjectDetailPage({
   function startEditingContext() {
     setContextForm({
       clientProblems: data?.project.clientProblems || "",
-      clientGoals: data?.project.clientGoals || "",
+      competitorAnalysis: data?.project.competitorAnalysis || "",
+      projectRequirements: data?.project.projectRequirements || "",
+      clientNotes: data?.project.clientNotes || "",
     });
     setEditingContext(true);
   }
@@ -232,7 +239,9 @@ export default function ProjectDetailPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientProblems: contextForm.clientProblems,
-          clientGoals: contextForm.clientGoals,
+          competitorAnalysis: contextForm.competitorAnalysis,
+          projectRequirements: contextForm.projectRequirements,
+          clientNotes: contextForm.clientNotes,
         }),
       });
       if (!response.ok) throw new Error("Failed to save");
@@ -339,6 +348,7 @@ export default function ProjectDetailPage({
       preferredFeatureUrl: viewingCompetitor.preferredFeatureUrl || "",
       notes: viewingCompetitor.notes || "",
     });
+    setEditReferenceImages(viewingCompetitor.referenceImages || []);
     setEditingCompetitor(true);
   }
 
@@ -357,6 +367,7 @@ export default function ProjectDetailPage({
           preferredFeature: competitorEditForm.preferredFeature.trim(),
           preferredFeatureUrl: competitorEditForm.preferredFeatureUrl.trim(),
           notes: competitorEditForm.notes.trim(),
+          referenceImages: editReferenceImages,
         }),
       });
 
@@ -459,24 +470,6 @@ export default function ProjectDetailPage({
             className="bg-background rounded-xl border shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            {viewingCompetitor.screenshot && !editingCompetitor && (
-              <button
-                type="button"
-                className="w-full cursor-pointer group"
-                onClick={() =>
-                  setViewingScreenshot({
-                    url: viewingCompetitor.screenshot!,
-                    title: viewingCompetitor.name,
-                  })
-                }
-              >
-                <img
-                  src={viewingCompetitor.screenshot}
-                  alt={`Screenshot of ${viewingCompetitor.name}`}
-                  className="w-full max-h-72 object-cover object-top rounded-t-xl group-hover:opacity-90 transition-opacity"
-                />
-              </button>
-            )}
             <div className="p-6 space-y-4">
               {editingCompetitor ? (
                 <>
@@ -565,6 +558,54 @@ export default function ProjectDetailPage({
                         rows={4}
                         disabled={savingCompetitorEdit}
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Reference screenshots</label>
+                      {editReferenceImages.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {editReferenceImages.map((img, i) => (
+                            <div key={i} className="relative group/thumb">
+                              <img
+                                src={img}
+                                alt={`Reference ${i + 1}`}
+                                className="rounded-md border h-20 w-20 object-cover"
+                              />
+                              <button
+                                type="button"
+                                className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center text-xs opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                                onClick={() =>
+                                  setEditReferenceImages((prev) => prev.filter((_, j) => j !== i))
+                                }
+                                disabled={savingCompetitorEdit}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <label className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm cursor-pointer hover:bg-muted/50 transition-colors w-fit">
+                        <Upload className="h-4 w-4 text-muted-foreground" />
+                        <span>Upload images</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          disabled={savingCompetitorEdit}
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            files.forEach((file) => {
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setEditReferenceImages((prev) => [...prev, reader.result as string]);
+                              };
+                              reader.readAsDataURL(file);
+                            });
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -672,6 +713,28 @@ export default function ProjectDetailPage({
                           </button>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {viewingCompetitor.screenshot && (
+                    <div>
+                      <p className="text-sm font-medium mb-2">Auto-captured Screenshot</p>
+                      <button
+                        type="button"
+                        className="group/auto cursor-pointer"
+                        onClick={() =>
+                          setViewingScreenshot({
+                            url: viewingCompetitor.screenshot!,
+                            title: `${viewingCompetitor.name} — Auto-captured`,
+                          })
+                        }
+                      >
+                        <img
+                          src={viewingCompetitor.screenshot}
+                          alt={`Auto-captured screenshot of ${viewingCompetitor.name}`}
+                          className="rounded-md border h-24 w-auto max-w-full object-cover object-top group-hover/auto:ring-2 group-hover/auto:ring-primary transition-all"
+                        />
+                      </button>
                     </div>
                   )}
 
@@ -995,27 +1058,56 @@ export default function ProjectDetailPage({
                   <MessageSquare className="h-4 w-4" />
                   Client Problems
                 </label>
-                <Textarea
+                <MarkdownEditor
                   placeholder="Describe current challenges..."
                   value={contextForm.clientProblems}
-                  onChange={(e) =>
-                    setContextForm({ ...contextForm, clientProblems: e.target.value })
+                  onChange={(md) =>
+                    setContextForm({ ...contextForm, clientProblems: md })
                   }
-                  rows={3}
+                  disabled={savingContext}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
                   <Target className="h-4 w-4" />
-                  Main Goals
+                  Competitor Analysis & Desired Features
                 </label>
-                <Textarea
-                  placeholder="What does the client want to achieve..."
-                  value={contextForm.clientGoals}
-                  onChange={(e) =>
-                    setContextForm({ ...contextForm, clientGoals: e.target.value })
+                <MarkdownEditor
+                  placeholder="Competitor insights, desired features, and functionality goals..."
+                  value={contextForm.competitorAnalysis}
+                  onChange={(md) =>
+                    setContextForm({ ...contextForm, competitorAnalysis: md })
                   }
-                  rows={3}
+                  disabled={savingContext}
+                />
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4" />
+                  New Project Requirements
+                </label>
+                <MarkdownEditor
+                  placeholder="What does the new project need to include..."
+                  value={contextForm.projectRequirements}
+                  onChange={(md) =>
+                    setContextForm({ ...contextForm, projectRequirements: md })
+                  }
+                  disabled={savingContext}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <StickyNote className="h-4 w-4" />
+                  Additional Notes from the Client
+                </label>
+                <MarkdownEditor
+                  placeholder="Any other notes or context from the client..."
+                  value={contextForm.clientNotes}
+                  onChange={(md) =>
+                    setContextForm({ ...contextForm, clientNotes: md })
+                  }
+                  disabled={savingContext}
                 />
               </div>
               <div className="flex gap-2">
@@ -1038,28 +1130,53 @@ export default function ProjectDetailPage({
                 </Button>
               </div>
             </div>
-          ) : project.clientProblems || project.clientGoals ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+          ) : project.clientProblems || project.competitorAnalysis || project.projectRequirements || project.clientNotes ? (
+            <div className="space-y-5">
               {project.clientProblems && (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                    Problems
-                  </p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {project.clientProblems}
-                  </p>
+                <div className="rounded-lg border-l-[3px] border-l-rose-500 bg-rose-50/50 dark:bg-rose-950/20 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <MessageSquare className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                    <h3 className="text-[13px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">Problems</h3>
+                  </div>
+                  <div className="text-sm text-foreground/90">
+                    <MarkdownViewer content={project.clientProblems} />
+                  </div>
                 </div>
               )}
-              {project.clientGoals && (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium flex items-center gap-2">
-                    <Target className="h-4 w-4 text-muted-foreground" />
-                    Goals
-                  </p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {project.clientGoals}
-                  </p>
+
+              {project.competitorAnalysis && (
+                <div className="rounded-lg border-l-[3px] border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <h3 className="text-[13px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">Competitor Analysis & Desired Features</h3>
+                  </div>
+                  <div className="text-sm text-foreground/90">
+                    <MarkdownViewer content={project.competitorAnalysis} />
+                  </div>
+                </div>
+              )}
+
+              {project.projectRequirements && (
+                <div className="rounded-lg border-l-[3px] border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ClipboardList className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <h3 className="text-[13px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">New Project Requirements</h3>
+                  </div>
+                  <div className="text-sm text-foreground/90">
+                    <MarkdownViewer content={project.projectRequirements} />
+                  </div>
+                </div>
+              )}
+
+              {project.clientNotes && (
+                <div className="rounded-lg border-l-[3px] border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <StickyNote className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <h3 className="text-[13px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Additional Notes from the Client</h3>
+                  </div>
+                  <div className="text-sm text-foreground/90">
+                    <MarkdownViewer content={project.clientNotes} />
+                  </div>
                 </div>
               )}
             </div>
@@ -1271,17 +1388,19 @@ export default function ProjectDetailPage({
 
           {competitors.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {competitors.map((comp) => (
+              {competitors.map((comp) => {
+                const thumbSrc = comp.referenceImages?.[0] || comp.screenshot;
+                return (
                 <button
                   key={comp.id}
                   type="button"
                   className="flex flex-col rounded-lg border overflow-hidden hover:border-primary/50 hover:shadow-md transition-all text-left group"
                   onClick={() => setViewingCompetitor(comp)}
                 >
-                  {comp.screenshot ? (
+                  {thumbSrc ? (
                     <div className="relative aspect-video bg-muted overflow-hidden">
                       <img
-                        src={comp.screenshot}
+                        src={thumbSrc}
                         alt={`Screenshot of ${comp.name}`}
                         className="w-full h-full object-cover object-top transition-transform group-hover:scale-105"
                       />
@@ -1303,7 +1422,8 @@ export default function ProjectDetailPage({
                     </p>
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           ) : !addingCompetitor ? (
             <button

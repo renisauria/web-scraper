@@ -9,7 +9,7 @@ const createProjectSchema = z.object({
   url: z.string().url("Valid URL is required"),
   clientName: z.string().optional(),
   clientProblems: z.string().optional(),
-  clientGoals: z.string().optional(),
+  competitorAnalysis: z.string().optional(),
 });
 
 export async function GET() {
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       url: validatedData.url,
       clientName: validatedData.clientName || null,
       clientProblems: validatedData.clientProblems || null,
-      clientGoals: validatedData.clientGoals || null,
+      competitorAnalysis: validatedData.competitorAnalysis || null,
       status: "pending" as const,
       createdAt: new Date(),
       updatedAt: new Date(),

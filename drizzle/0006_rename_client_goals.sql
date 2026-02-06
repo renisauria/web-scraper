@@ -1,0 +1,1 @@
+ALTER TABLE `projects` RENAME COLUMN `client_goals` TO `competitor_analysis`;
