@@ -7,6 +7,8 @@ const updateProjectSchema = z.object({
   name: z.string().min(1).optional(),
   url: z.string().url().optional(),
   clientName: z.string().optional(),
+  clientProblems: z.string().optional(),
+  clientGoals: z.string().optional(),
   status: z.enum(["pending", "scraping", "scraped", "analyzing", "complete", "error"]).optional(),
 });
 

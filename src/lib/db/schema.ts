@@ -5,6 +5,8 @@ export const projects = sqliteTable("projects", {
   name: text("name").notNull(),
   url: text("url").notNull(),
   clientName: text("client_name"),
+  clientProblems: text("client_problems"),
+  clientGoals: text("client_goals"),
   crawlJobId: text("crawl_job_id"),
   status: text("status", {
     enum: ["pending", "scraping", "scraped", "analyzing", "complete", "error"],
@@ -67,6 +69,18 @@ export const analyses = sqliteTable("analyses", {
     .$defaultFn(() => new Date()),
 });
 
+export const sitemaps = sqliteTable("sitemaps", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  type: text("type", { enum: ["current", "recommended"] }).notNull(),
+  data: text("data", { mode: "json" }).$type<Record<string, unknown>>(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
 export type Page = typeof pages.$inferSelect;
@@ -75,3 +89,5 @@ export type PageVersion = typeof pageVersions.$inferSelect;
 export type NewPageVersion = typeof pageVersions.$inferInsert;
 export type Analysis = typeof analyses.$inferSelect;
 export type NewAnalysis = typeof analyses.$inferInsert;
+export type Sitemap = typeof sitemaps.$inferSelect;
+export type NewSitemap = typeof sitemaps.$inferInsert;

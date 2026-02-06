@@ -63,14 +63,30 @@ export async function POST(request: NextRequest) {
         ? combinedContent.slice(0, maxContentLength) + "\n\n[Content truncated...]"
         : combinedContent;
 
+    // Build rich context from project data
+    const proj = project[0];
+    let additionalContext = `Website: ${proj.url}`;
+    if (proj.clientName) {
+      additionalContext += `\nClient: ${proj.clientName}`;
+    }
+    if (proj.clientProblems) {
+      additionalContext += `\nClient Problems: ${proj.clientProblems}`;
+    }
+    if (proj.clientGoals) {
+      additionalContext += `\nClient Goals: ${proj.clientGoals}`;
+    }
+    if (proj.clientProblems || proj.clientGoals) {
+      additionalContext += `\n\nPlease specifically address the client's stated problems and goals in your analysis.`;
+    }
+
     let results;
     if (type === "all") {
-      results = await analyzeAll(truncatedContent, `Website: ${project[0].url}`);
+      results = await analyzeAll(truncatedContent, additionalContext);
     } else {
       const result = await analyzeContent(
         truncatedContent,
         type as AnalysisType,
-        `Website: ${project[0].url}`
+        additionalContext
       );
       results = [result];
     }

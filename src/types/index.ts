@@ -18,6 +18,8 @@ export interface Project {
   name: string;
   url: string;
   clientName: string | null;
+  clientProblems: string | null;
+  clientGoals: string | null;
   crawlJobId: string | null;
   status: ProjectStatus;
   createdAt: Date;
@@ -190,4 +192,43 @@ export interface RecommendationsAnalysis {
     phase3: string[];
   };
   summary: string;
+}
+
+export interface SitemapNode {
+  id: string;
+  label: string;
+  path: string;
+  url?: string;
+  pageType?: "homepage" | "collection" | "product" | "page" | "blog" | "article" | "other";
+  hasContent?: boolean;
+  children: SitemapNode[];
+  metadata?: {
+    title?: string;
+    shopifyResourceType?: string;
+    visualMockupId?: string;
+    isNew?: boolean;
+    isRemoved?: boolean;
+    isMoved?: boolean;
+    movedFrom?: string;
+    priority?: "high" | "medium" | "low";
+    notes?: string;
+  };
+}
+
+export interface SitemapData {
+  rootNode: SitemapNode;
+  totalPages: number;
+  maxDepth: number;
+  generatedAt: string;
+  projectUrl: string;
+  aiRationale?: string;
+  keyChanges?: string[];
+}
+
+export interface SitemapType {
+  id: string;
+  projectId: string;
+  type: "current" | "recommended";
+  data: SitemapData;
+  createdAt: Date;
 }

@@ -210,6 +210,90 @@ export async function analyzeContent(
   }
 }
 
+export async function generateRecommendedSitemap(
+  currentSitemap: Record<string, unknown>,
+  pageContent: string,
+  context: {
+    clientName: string | null;
+    clientProblems: string | null;
+    clientGoals: string | null;
+    projectUrl: string;
+  }
+): Promise<Record<string, unknown>> {
+  const systemPrompt = `You are a Shopify information architecture (IA) expert and SEO strategist. You will receive a current website sitemap structure and page content. Your job is to recommend an improved sitemap that:
+
+1. Follows Shopify best practices for collections, products, pages, and blog structure
+2. Optimizes for SEO with clean URL hierarchy
+3. Improves conversion paths and user navigation
+4. Consolidates or removes redundant pages
+5. Suggests new pages that are missing but important
+
+Return a JSON object with this exact structure:
+{
+  "rootNode": {
+    "id": string (uuid),
+    "label": string,
+    "path": "/",
+    "url": string,
+    "pageType": "homepage" | "collection" | "product" | "page" | "blog" | "article" | "other",
+    "hasContent": boolean,
+    "children": [recursive same structure],
+    "metadata": {
+      "title": string,
+      "isNew": boolean (true if this is a new page suggestion),
+      "isRemoved": boolean (true if recommending removal),
+      "isMoved": boolean (true if recommending relocation),
+      "movedFrom": string | null (original path if moved),
+      "priority": "high" | "medium" | "low",
+      "notes": string (brief explanation of why this change)
+    }
+  },
+  "totalPages": number,
+  "maxDepth": number,
+  "generatedAt": string (ISO date),
+  "projectUrl": string,
+  "aiRationale": string (2-3 paragraph explanation of overall IA strategy),
+  "keyChanges": string[] (list of 5-8 key changes/improvements made)
+}
+
+Important rules:
+- Keep existing pages that work well (don't annotate them as new/removed/moved)
+- Use Shopify-standard paths: /collections/*, /products/*, /pages/*, /blogs/*
+- Every node must have a unique "id" field (use uuid format)
+- Set appropriate "pageType" for each node
+- Include "notes" for any node with isNew, isRemoved, or isMoved set to true`;
+
+  let userPrompt = `Current website: ${context.projectUrl}\n\n`;
+  if (context.clientName) userPrompt += `Client: ${context.clientName}\n`;
+  if (context.clientProblems) userPrompt += `Client Problems: ${context.clientProblems}\n`;
+  if (context.clientGoals) userPrompt += `Client Goals: ${context.clientGoals}\n`;
+  userPrompt += `\nCurrent Sitemap Structure:\n${JSON.stringify(currentSitemap, null, 2)}\n\n`;
+  userPrompt += `Page Content:\n${pageContent}`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4-turbo-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+      max_tokens: 4000,
+    });
+
+    const responseContent = completion.choices[0]?.message?.content;
+    if (!responseContent) {
+      throw new Error("No response from OpenAI");
+    }
+
+    return JSON.parse(responseContent);
+  } catch (error) {
+    console.error("OpenAI sitemap generation error:", error);
+    throw error;
+  }
+}
+
 export async function analyzeAll(
   content: string,
   additionalContext?: string

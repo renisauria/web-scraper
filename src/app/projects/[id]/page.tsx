@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft,
   Globe,
@@ -30,6 +31,12 @@ import {
   Image as ImageIcon,
   Plus,
   Link as LinkIcon,
+  Map,
+  Pencil,
+  X,
+  Save,
+  MessageSquare,
+  Target,
 } from "lucide-react";
 import type { Project, Page, Analysis } from "@/types";
 import { AnalysisModal } from "@/components/analysis-modal";
@@ -55,6 +62,9 @@ export default function ProjectDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [singleUrl, setSingleUrl] = useState("");
   const [scrapingSingle, setScrapingSingle] = useState(false);
+  const [editingContext, setEditingContext] = useState(false);
+  const [contextForm, setContextForm] = useState({ clientProblems: "", clientGoals: "" });
+  const [savingContext, setSavingContext] = useState(false);
 
   const fetchProject = useCallback(async () => {
     try {
@@ -192,6 +202,35 @@ export default function ProjectDetailPage({
     }
   }
 
+  function startEditingContext() {
+    setContextForm({
+      clientProblems: data?.project.clientProblems || "",
+      clientGoals: data?.project.clientGoals || "",
+    });
+    setEditingContext(true);
+  }
+
+  async function saveContext() {
+    setSavingContext(true);
+    try {
+      const response = await fetch(`/api/projects/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientProblems: contextForm.clientProblems,
+          clientGoals: contextForm.clientGoals,
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to save");
+      await fetchProject();
+      setEditingContext(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save context");
+    } finally {
+      setSavingContext(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -287,6 +326,14 @@ export default function ProjectDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {hasScrapedData && (
+            <Link href={`/projects/${id}/sitemap`}>
+              <Button variant="outline">
+                <Map className="h-4 w-4 mr-2" />
+                Sitemap
+              </Button>
+            </Link>
+          )}
           {hasAnalyses && (
             <Link href={`/projects/${id}/report`}>
               <Button variant="outline">
@@ -484,6 +531,107 @@ export default function ProjectDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      <Card className="lg:col-span-3">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Client Context</CardTitle>
+            {!editingContext && (
+              <Button variant="ghost" size="icon" onClick={startEditingContext}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          <CardDescription>
+            Problems and goals inform AI analysis recommendations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {editingContext ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Client Problems
+                </label>
+                <Textarea
+                  placeholder="Describe current challenges..."
+                  value={contextForm.clientProblems}
+                  onChange={(e) =>
+                    setContextForm({ ...contextForm, clientProblems: e.target.value })
+                  }
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Main Goals
+                </label>
+                <Textarea
+                  placeholder="What does the client want to achieve..."
+                  value={contextForm.clientGoals}
+                  onChange={(e) =>
+                    setContextForm({ ...contextForm, clientGoals: e.target.value })
+                  }
+                  rows={3}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={saveContext} disabled={savingContext} size="sm">
+                  {savingContext ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingContext(false)}
+                  disabled={savingContext}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : project.clientProblems || project.clientGoals ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {project.clientProblems && (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                    Problems
+                  </p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {project.clientProblems}
+                  </p>
+                </div>
+              )}
+              {project.clientGoals && (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Target className="h-4 w-4 text-muted-foreground" />
+                    Goals
+                  </p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {project.clientGoals}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={startEditingContext}
+              className="w-full p-4 rounded-lg border border-dashed text-sm text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors text-center"
+            >
+              Add client context to improve AI analysis
+            </button>
+          )}
+        </CardContent>
+      </Card>
 
       {pages.length > 0 && (
         <Card>

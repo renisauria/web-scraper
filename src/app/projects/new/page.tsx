@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
@@ -24,6 +25,8 @@ export default function NewProjectPage() {
     name: "",
     url: "",
     clientName: "",
+    clientProblems: "",
+    clientGoals: "",
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -129,6 +132,38 @@ export default function NewProjectPage() {
                   setFormData({ ...formData, clientName: e.target.value })
                 }
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="clientProblems">Client Problems (Optional)</Label>
+              <Textarea
+                id="clientProblems"
+                placeholder="Describe current challenges the client is facing with their website..."
+                value={formData.clientProblems}
+                onChange={(e) =>
+                  setFormData({ ...formData, clientProblems: e.target.value })
+                }
+                rows={3}
+              />
+              <p className="text-sm text-muted-foreground">
+                Adding client problems helps improve AI analysis recommendations
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="clientGoals">Main Goals (Optional)</Label>
+              <Textarea
+                id="clientGoals"
+                placeholder="What does the client want to achieve with their website..."
+                value={formData.clientGoals}
+                onChange={(e) =>
+                  setFormData({ ...formData, clientGoals: e.target.value })
+                }
+                rows={3}
+              />
+              <p className="text-sm text-muted-foreground">
+                Adding goals helps the AI tailor its analysis to specific objectives
+              </p>
             </div>
 
             <div className="flex gap-4">
