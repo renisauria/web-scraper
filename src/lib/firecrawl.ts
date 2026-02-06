@@ -196,6 +196,21 @@ export async function scrapeSinglePage(url: string): Promise<ScrapedPage | null>
   }
 }
 
+// Capture only a viewport screenshot (no content scraping)
+export async function captureViewportScreenshot(url: string): Promise<string | null> {
+  try {
+    const client = getFirecrawl();
+    const doc = await client.scrape(url, {
+      formats: [VIEWPORT_SCREENSHOT_CONFIG],
+    });
+
+    return doc.screenshot || null;
+  } catch (error) {
+    console.error("Firecrawl viewport screenshot error:", error);
+    return null;
+  }
+}
+
 // Capture only a full-page screenshot (no content scraping)
 export async function captureFullPageScreenshot(url: string): Promise<string | null> {
   try {

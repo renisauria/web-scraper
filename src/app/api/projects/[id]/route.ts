@@ -39,10 +39,16 @@ export async function GET(
       .from(schema.analyses)
       .where(eq(schema.analyses.projectId, id));
 
+    const competitors = await db
+      .select()
+      .from(schema.competitors)
+      .where(eq(schema.competitors.projectId, id));
+
     return NextResponse.json({
       project: project[0],
       pages,
       analyses,
+      competitors,
     });
   } catch (error) {
     console.error("Error fetching project:", error);

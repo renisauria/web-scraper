@@ -194,6 +194,22 @@ export interface RecommendationsAnalysis {
   summary: string;
 }
 
+export type CompetitorType = "competitor" | "inspiration";
+
+export interface Competitor {
+  id: string;
+  projectId: string;
+  name: string;
+  url: string;
+  type: CompetitorType;
+  preferredFeature: string | null;
+  preferredFeatureUrl: string | null;
+  screenshot: string | null;
+  referenceImages: string[] | null;
+  notes: string | null;
+  createdAt: Date;
+}
+
 export interface SitemapNode {
   id: string;
   label: string;

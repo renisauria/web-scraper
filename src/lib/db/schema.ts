@@ -91,3 +91,24 @@ export type Analysis = typeof analyses.$inferSelect;
 export type NewAnalysis = typeof analyses.$inferInsert;
 export type Sitemap = typeof sitemaps.$inferSelect;
 export type NewSitemap = typeof sitemaps.$inferInsert;
+
+export const competitors = sqliteTable("competitors", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  type: text("type", { enum: ["competitor", "inspiration"] }).notNull().default("competitor"),
+  preferredFeature: text("preferred_feature"),
+  preferredFeatureUrl: text("preferred_feature_url"),
+  screenshot: text("screenshot"),
+  referenceImages: text("reference_image", { mode: "json" }).$type<string[]>(),
+  notes: text("notes"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type Competitor = typeof competitors.$inferSelect;
+export type NewCompetitor = typeof competitors.$inferInsert;

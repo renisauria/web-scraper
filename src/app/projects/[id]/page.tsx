@@ -37,14 +37,18 @@ import {
   Save,
   MessageSquare,
   Target,
+  RefreshCw,
+  Trash2,
+  Upload,
 } from "lucide-react";
-import type { Project, Page, Analysis } from "@/types";
+import type { Project, Page, Analysis, Competitor, CompetitorType } from "@/types";
 import { AnalysisModal } from "@/components/analysis-modal";
 
 interface ProjectData {
   project: Project;
   pages: Page[];
   analyses: Analysis[];
+  competitors: Competitor[];
 }
 
 export default function ProjectDetailPage({
@@ -65,6 +69,12 @@ export default function ProjectDetailPage({
   const [editingContext, setEditingContext] = useState(false);
   const [contextForm, setContextForm] = useState({ clientProblems: "", clientGoals: "" });
   const [savingContext, setSavingContext] = useState(false);
+  const [addingCompetitor, setAddingCompetitor] = useState(false);
+  const [competitorForm, setCompetitorForm] = useState({ name: "", url: "", type: "competitor" as CompetitorType, preferredFeature: "", preferredFeatureUrl: "", notes: "" });
+  const [savingCompetitor, setSavingCompetitor] = useState(false);
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
+  const [capturingCompetitorId, setCapturingCompetitorId] = useState<string | null>(null);
+  const [viewingScreenshot, setViewingScreenshot] = useState<{ url: string; title: string } | null>(null);
 
   const fetchProject = useCallback(async () => {
     try {
@@ -231,6 +241,87 @@ export default function ProjectDetailPage({
     }
   }
 
+  async function addCompetitor() {
+    if (!competitorForm.name.trim() || !competitorForm.url.trim()) return;
+
+    setError(null);
+    setSavingCompetitor(true);
+
+    try {
+      const response = await fetch("/api/competitors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: id,
+          name: competitorForm.name.trim(),
+          url: competitorForm.url.trim(),
+          type: competitorForm.type,
+          preferredFeature: competitorForm.preferredFeature.trim() || undefined,
+          preferredFeatureUrl: competitorForm.preferredFeatureUrl.trim() || undefined,
+          referenceImages: referenceImages.length ? referenceImages : undefined,
+          notes: competitorForm.notes.trim() || undefined,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to add competitor");
+      }
+
+      setCompetitorForm({ name: "", url: "", type: "competitor", preferredFeature: "", preferredFeatureUrl: "", notes: "" });
+      setReferenceImages([]);
+      setAddingCompetitor(false);
+      await fetchProject();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add competitor");
+    } finally {
+      setSavingCompetitor(false);
+    }
+  }
+
+  async function recaptureCompetitor(competitorId: string) {
+    setError(null);
+    setCapturingCompetitorId(competitorId);
+
+    try {
+      const response = await fetch(`/api/competitors/${competitorId}`, {
+        method: "POST",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to recapture screenshot");
+      }
+
+      await fetchProject();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to recapture screenshot");
+    } finally {
+      setCapturingCompetitorId(null);
+    }
+  }
+
+  async function deleteCompetitor(competitorId: string) {
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/competitors/${competitorId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Failed to delete competitor");
+      }
+
+      await fetchProject();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete competitor");
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -248,7 +339,7 @@ export default function ProjectDetailPage({
     );
   }
 
-  const { project, pages, analyses } = data;
+  const { project, pages, analyses, competitors } = data;
 
   // Sort pages: homepage first, then by URL depth and alphabetically
   const sortedPages = [...pages].sort((a, b) => {
@@ -304,6 +395,33 @@ export default function ProjectDetailPage({
   return (
     <>
       <AnalysisModal isOpen={analyzing} />
+
+      {viewingScreenshot && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setViewingScreenshot(null)}
+        >
+          <div className="relative max-w-5xl w-full max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-white font-medium">{viewingScreenshot.title}</p>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:bg-white/20"
+                onClick={() => setViewingScreenshot(null)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <img
+              src={viewingScreenshot.url}
+              alt={`Screenshot of ${viewingScreenshot.title}`}
+              className="w-full max-h-[80vh] object-contain rounded-lg"
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -630,6 +748,341 @@ export default function ProjectDetailPage({
               Add client context to improve AI analysis
             </button>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Competitors & Inspiration</CardTitle>
+              <CardDescription>
+                Capture screenshots of competitor and inspiration websites for reference
+              </CardDescription>
+            </div>
+            {!addingCompetitor && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAddingCompetitor(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Competitor
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {addingCompetitor && (
+            <div className="space-y-3 mb-6 p-4 rounded-lg border bg-muted/30">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Name</label>
+                <Input
+                  placeholder="e.g. Acme Corp"
+                  value={competitorForm.name}
+                  onChange={(e) =>
+                    setCompetitorForm({ ...competitorForm, name: e.target.value })
+                  }
+                  disabled={savingCompetitor}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">URL</label>
+                <Input
+                  type="url"
+                  placeholder="https://competitor.com"
+                  value={competitorForm.url}
+                  onChange={(e) =>
+                    setCompetitorForm({ ...competitorForm, url: e.target.value })
+                  }
+                  disabled={savingCompetitor}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Type</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="competitorType"
+                      value="competitor"
+                      checked={competitorForm.type === "competitor"}
+                      onChange={() => setCompetitorForm({ ...competitorForm, type: "competitor" })}
+                      disabled={savingCompetitor}
+                      className="accent-primary"
+                    />
+                    Competitor
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="competitorType"
+                      value="inspiration"
+                      checked={competitorForm.type === "inspiration"}
+                      onChange={() => setCompetitorForm({ ...competitorForm, type: "inspiration" })}
+                      disabled={savingCompetitor}
+                      className="accent-primary"
+                    />
+                    Inspiration
+                  </label>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Preferred functionality (optional)</label>
+                <Input
+                  placeholder="e.g. Interactive product configurator"
+                  value={competitorForm.preferredFeature}
+                  onChange={(e) =>
+                    setCompetitorForm({ ...competitorForm, preferredFeature: e.target.value })
+                  }
+                  disabled={savingCompetitor}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Functionality URL (optional)</label>
+                <Input
+                  type="url"
+                  placeholder="https://competitor.com/feature-page"
+                  value={competitorForm.preferredFeatureUrl}
+                  onChange={(e) =>
+                    setCompetitorForm({ ...competitorForm, preferredFeatureUrl: e.target.value })
+                  }
+                  disabled={savingCompetitor}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Reference screenshots (optional)</label>
+                <label className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm cursor-pointer hover:bg-muted/50 transition-colors w-fit">
+                  <Upload className="h-4 w-4 text-muted-foreground" />
+                  <span>Upload images</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    disabled={savingCompetitor}
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      files.forEach((file) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setReferenceImages((prev) => [...prev, reader.result as string]);
+                        };
+                        reader.readAsDataURL(file);
+                      });
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {referenceImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {referenceImages.map((img, i) => (
+                      <div key={i} className="relative group/thumb">
+                        <img
+                          src={img}
+                          alt={`Reference ${i + 1}`}
+                          className="rounded-md border h-20 w-20 object-cover"
+                        />
+                        <button
+                          type="button"
+                          className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center text-xs opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                          onClick={() =>
+                            setReferenceImages((prev) => prev.filter((_, j) => j !== i))
+                          }
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Upload screenshots for AI image generation reference
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Notes (optional)</label>
+                <Textarea
+                  placeholder="Any notes about this competitor..."
+                  value={competitorForm.notes}
+                  onChange={(e) =>
+                    setCompetitorForm({ ...competitorForm, notes: e.target.value })
+                  }
+                  rows={2}
+                  disabled={savingCompetitor}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={addCompetitor}
+                  disabled={
+                    !competitorForm.name.trim() ||
+                    !competitorForm.url.trim() ||
+                    savingCompetitor
+                  }
+                  size="sm"
+                >
+                  {savingCompetitor ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <ImageIcon className="h-4 w-4 mr-2" />
+                  )}
+                  {savingCompetitor ? "Capturing..." : "Capture & Save"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setAddingCompetitor(false);
+                    setCompetitorForm({ name: "", url: "", type: "competitor", preferredFeature: "", preferredFeatureUrl: "", notes: "" });
+                    setReferenceImages([]);
+                  }}
+                  disabled={savingCompetitor}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {competitors.length > 0 ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {competitors.map((comp) => (
+                <div
+                  key={comp.id}
+                  className="flex flex-col rounded-lg border overflow-hidden"
+                >
+                  {comp.screenshot ? (
+                    <button
+                      type="button"
+                      className="relative aspect-video bg-muted overflow-hidden cursor-pointer group"
+                      onClick={() =>
+                        setViewingScreenshot({
+                          url: comp.screenshot!,
+                          title: comp.name,
+                        })
+                      }
+                    >
+                      <img
+                        src={comp.screenshot}
+                        alt={`Screenshot of ${comp.name}`}
+                        className="w-full h-full object-cover object-top transition-transform group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                    </button>
+                  ) : (
+                    <div className="aspect-video bg-muted flex items-center justify-center">
+                      <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+                    </div>
+                  )}
+                  <div className="p-3 space-y-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm">{comp.name}</p>
+                        <Badge variant={comp.type === "competitor" ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0">
+                          {comp.type === "competitor" ? "Competitor" : "Inspiration"}
+                        </Badge>
+                      </div>
+                      <a
+                        href={comp.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-muted-foreground hover:text-blue-600 flex items-center gap-1 truncate"
+                      >
+                        {comp.url}
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                      </a>
+                    </div>
+                    {comp.preferredFeature && (
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Preferred: </span>
+                        {comp.preferredFeatureUrl ? (
+                          <a
+                            href={comp.preferredFeatureUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            {comp.preferredFeature}
+                            <ExternalLink className="inline h-2.5 w-2.5 ml-0.5" />
+                          </a>
+                        ) : (
+                          <span>{comp.preferredFeature}</span>
+                        )}
+                      </div>
+                    )}
+                    {comp.referenceImages && comp.referenceImages.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Reference{comp.referenceImages.length > 1 ? ` (${comp.referenceImages.length})` : ""}:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {comp.referenceImages.map((img, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              className="group/ref cursor-pointer"
+                              onClick={() =>
+                                setViewingScreenshot({
+                                  url: img,
+                                  title: `${comp.name} — Reference ${i + 1}`,
+                                })
+                              }
+                            >
+                              <img
+                                src={img}
+                                alt={`Reference ${i + 1} for ${comp.name}`}
+                                className="rounded border h-12 w-12 object-cover group-hover/ref:opacity-80 transition-opacity"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {comp.notes && (
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {comp.notes}
+                      </p>
+                    )}
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => recaptureCompetitor(comp.id)}
+                        disabled={capturingCompetitorId === comp.id}
+                        title="Recapture screenshot"
+                      >
+                        {capturingCompetitorId === comp.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => deleteCompetitor(comp.id)}
+                        disabled={capturingCompetitorId === comp.id}
+                        title="Delete competitor"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !addingCompetitor ? (
+            <button
+              onClick={() => setAddingCompetitor(true)}
+              className="w-full p-4 rounded-lg border border-dashed text-sm text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors text-center"
+            >
+              Add competitor or inspiration sites to capture screenshots for reference
+            </button>
+          ) : null}
         </CardContent>
       </Card>
 

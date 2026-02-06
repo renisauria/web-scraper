@@ -1,0 +1,1 @@
+ALTER TABLE `competitors` ADD `type` text DEFAULT 'competitor' NOT NULL;
