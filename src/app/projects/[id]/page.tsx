@@ -74,6 +74,10 @@ export default function ProjectDetailPage({
   const [savingCompetitor, setSavingCompetitor] = useState(false);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [capturingCompetitorId, setCapturingCompetitorId] = useState<string | null>(null);
+  const [viewingCompetitor, setViewingCompetitor] = useState<Competitor | null>(null);
+  const [editingCompetitor, setEditingCompetitor] = useState(false);
+  const [competitorEditForm, setCompetitorEditForm] = useState({ name: "", url: "", type: "competitor" as CompetitorType, preferredFeature: "", preferredFeatureUrl: "", notes: "" });
+  const [savingCompetitorEdit, setSavingCompetitorEdit] = useState(false);
   const [viewingScreenshot, setViewingScreenshot] = useState<{ url: string; title: string } | null>(null);
 
   const fetchProject = useCallback(async () => {
@@ -295,6 +299,9 @@ export default function ProjectDetailPage({
         throw new Error(result.error || "Failed to recapture screenshot");
       }
 
+      if (viewingCompetitor?.id === competitorId && result.competitor) {
+        setViewingCompetitor(result.competitor);
+      }
       await fetchProject();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to recapture screenshot");
@@ -319,6 +326,53 @@ export default function ProjectDetailPage({
       await fetchProject();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete competitor");
+    }
+  }
+
+  function startEditingCompetitor() {
+    if (!viewingCompetitor) return;
+    setCompetitorEditForm({
+      name: viewingCompetitor.name,
+      url: viewingCompetitor.url,
+      type: viewingCompetitor.type,
+      preferredFeature: viewingCompetitor.preferredFeature || "",
+      preferredFeatureUrl: viewingCompetitor.preferredFeatureUrl || "",
+      notes: viewingCompetitor.notes || "",
+    });
+    setEditingCompetitor(true);
+  }
+
+  async function saveCompetitorEdit() {
+    if (!viewingCompetitor) return;
+    setSavingCompetitorEdit(true);
+
+    try {
+      const response = await fetch(`/api/competitors/${viewingCompetitor.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: competitorEditForm.name.trim(),
+          url: competitorEditForm.url.trim(),
+          type: competitorEditForm.type,
+          preferredFeature: competitorEditForm.preferredFeature.trim(),
+          preferredFeatureUrl: competitorEditForm.preferredFeatureUrl.trim(),
+          notes: competitorEditForm.notes.trim(),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to save changes");
+      }
+
+      setViewingCompetitor(result.competitor);
+      setEditingCompetitor(false);
+      await fetchProject();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save changes");
+    } finally {
+      setSavingCompetitorEdit(false);
     }
   }
 
@@ -396,9 +450,278 @@ export default function ProjectDetailPage({
     <>
       <AnalysisModal isOpen={analyzing} />
 
+      {viewingCompetitor && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => { setViewingCompetitor(null); setEditingCompetitor(false); }}
+        >
+          <div
+            className="bg-background rounded-xl border shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {viewingCompetitor.screenshot && !editingCompetitor && (
+              <button
+                type="button"
+                className="w-full cursor-pointer group"
+                onClick={() =>
+                  setViewingScreenshot({
+                    url: viewingCompetitor.screenshot!,
+                    title: viewingCompetitor.name,
+                  })
+                }
+              >
+                <img
+                  src={viewingCompetitor.screenshot}
+                  alt={`Screenshot of ${viewingCompetitor.name}`}
+                  className="w-full max-h-72 object-cover object-top rounded-t-xl group-hover:opacity-90 transition-opacity"
+                />
+              </button>
+            )}
+            <div className="p-6 space-y-4">
+              {editingCompetitor ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold">Edit Competitor</h2>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setEditingCompetitor(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Name</label>
+                      <Input
+                        value={competitorEditForm.name}
+                        onChange={(e) => setCompetitorEditForm({ ...competitorEditForm, name: e.target.value })}
+                        disabled={savingCompetitorEdit}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">URL</label>
+                      <Input
+                        type="url"
+                        value={competitorEditForm.url}
+                        onChange={(e) => setCompetitorEditForm({ ...competitorEditForm, url: e.target.value })}
+                        disabled={savingCompetitorEdit}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Type</label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input
+                            type="radio"
+                            name="editCompetitorType"
+                            value="competitor"
+                            checked={competitorEditForm.type === "competitor"}
+                            onChange={() => setCompetitorEditForm({ ...competitorEditForm, type: "competitor" })}
+                            disabled={savingCompetitorEdit}
+                            className="accent-primary"
+                          />
+                          Competitor
+                        </label>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input
+                            type="radio"
+                            name="editCompetitorType"
+                            value="inspiration"
+                            checked={competitorEditForm.type === "inspiration"}
+                            onChange={() => setCompetitorEditForm({ ...competitorEditForm, type: "inspiration" })}
+                            disabled={savingCompetitorEdit}
+                            className="accent-primary"
+                          />
+                          Inspiration
+                        </label>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Preferred functionality</label>
+                      <Input
+                        placeholder="e.g. Interactive product configurator"
+                        value={competitorEditForm.preferredFeature}
+                        onChange={(e) => setCompetitorEditForm({ ...competitorEditForm, preferredFeature: e.target.value })}
+                        disabled={savingCompetitorEdit}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Functionality URL</label>
+                      <Input
+                        type="url"
+                        placeholder="https://competitor.com/feature-page"
+                        value={competitorEditForm.preferredFeatureUrl}
+                        onChange={(e) => setCompetitorEditForm({ ...competitorEditForm, preferredFeatureUrl: e.target.value })}
+                        disabled={savingCompetitorEdit}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Notes</label>
+                      <Textarea
+                        placeholder="Add notes..."
+                        value={competitorEditForm.notes}
+                        onChange={(e) => setCompetitorEditForm({ ...competitorEditForm, notes: e.target.value })}
+                        rows={4}
+                        disabled={savingCompetitorEdit}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={saveCompetitorEdit}
+                      disabled={!competitorEditForm.name.trim() || !competitorEditForm.url.trim() || savingCompetitorEdit}
+                    >
+                      {savingCompetitorEdit ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
+                      Save Changes
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditingCompetitor(false)}
+                      disabled={savingCompetitorEdit}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-semibold">{viewingCompetitor.name}</h2>
+                        <Badge variant={viewingCompetitor.type === "competitor" ? "secondary" : "outline"}>
+                          {viewingCompetitor.type === "competitor" ? "Competitor" : "Inspiration"}
+                        </Badge>
+                      </div>
+                      <a
+                        href={viewingCompetitor.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        {viewingCompetitor.url}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={startEditingCompetitor}
+                        title="Edit"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => { setViewingCompetitor(null); setEditingCompetitor(false); }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {viewingCompetitor.preferredFeature && (
+                    <div>
+                      <p className="text-sm font-medium mb-1">Preferred Functionality</p>
+                      {viewingCompetitor.preferredFeatureUrl ? (
+                        <a
+                          href={viewingCompetitor.preferredFeatureUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          {viewingCompetitor.preferredFeature}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">{viewingCompetitor.preferredFeature}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {viewingCompetitor.referenceImages && viewingCompetitor.referenceImages.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium mb-2">
+                        Reference Screenshots ({viewingCompetitor.referenceImages.length})
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {viewingCompetitor.referenceImages.map((img, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            className="group/ref cursor-pointer"
+                            onClick={() =>
+                              setViewingScreenshot({
+                                url: img,
+                                title: `${viewingCompetitor.name} — Reference ${i + 1}`,
+                              })
+                            }
+                          >
+                            <img
+                              src={img}
+                              alt={`Reference ${i + 1}`}
+                              className="rounded-md border h-24 w-24 object-cover group-hover/ref:ring-2 group-hover/ref:ring-primary transition-all"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {viewingCompetitor.notes && (
+                    <div>
+                      <p className="text-sm font-medium mb-1">Notes</p>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{viewingCompetitor.notes}</p>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => recaptureCompetitor(viewingCompetitor.id)}
+                      disabled={capturingCompetitorId === viewingCompetitor.id}
+                    >
+                      {capturingCompetitorId === viewingCompetitor.id ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                      )}
+                      Recapture Screenshot
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => {
+                        deleteCompetitor(viewingCompetitor.id);
+                        setViewingCompetitor(null);
+                        setEditingCompetitor(false);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {viewingScreenshot && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
           onClick={() => setViewingScreenshot(null)}
         >
           <div className="relative max-w-5xl w-full max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
@@ -949,130 +1272,37 @@ export default function ProjectDetailPage({
           {competitors.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {competitors.map((comp) => (
-                <div
+                <button
                   key={comp.id}
-                  className="flex flex-col rounded-lg border overflow-hidden"
+                  type="button"
+                  className="flex flex-col rounded-lg border overflow-hidden hover:border-primary/50 hover:shadow-md transition-all text-left group"
+                  onClick={() => setViewingCompetitor(comp)}
                 >
                   {comp.screenshot ? (
-                    <button
-                      type="button"
-                      className="relative aspect-video bg-muted overflow-hidden cursor-pointer group"
-                      onClick={() =>
-                        setViewingScreenshot({
-                          url: comp.screenshot!,
-                          title: comp.name,
-                        })
-                      }
-                    >
+                    <div className="relative aspect-video bg-muted overflow-hidden">
                       <img
                         src={comp.screenshot}
                         alt={`Screenshot of ${comp.name}`}
                         className="w-full h-full object-cover object-top transition-transform group-hover:scale-105"
                       />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                    </button>
+                    </div>
                   ) : (
                     <div className="aspect-video bg-muted flex items-center justify-center">
                       <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
                     </div>
                   )}
-                  <div className="p-3 space-y-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm">{comp.name}</p>
-                        <Badge variant={comp.type === "competitor" ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0">
-                          {comp.type === "competitor" ? "Competitor" : "Inspiration"}
-                        </Badge>
-                      </div>
-                      <a
-                        href={comp.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-muted-foreground hover:text-blue-600 flex items-center gap-1 truncate"
-                      >
-                        {comp.url}
-                        <ExternalLink className="h-3 w-3 shrink-0" />
-                      </a>
+                  <div className="p-3 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm group-hover:text-primary transition-colors">{comp.name}</p>
+                      <Badge variant={comp.type === "competitor" ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0">
+                        {comp.type === "competitor" ? "Competitor" : "Inspiration"}
+                      </Badge>
                     </div>
-                    {comp.preferredFeature && (
-                      <div className="text-xs">
-                        <span className="text-muted-foreground">Preferred: </span>
-                        {comp.preferredFeatureUrl ? (
-                          <a
-                            href={comp.preferredFeatureUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline"
-                          >
-                            {comp.preferredFeature}
-                            <ExternalLink className="inline h-2.5 w-2.5 ml-0.5" />
-                          </a>
-                        ) : (
-                          <span>{comp.preferredFeature}</span>
-                        )}
-                      </div>
-                    )}
-                    {comp.referenceImages && comp.referenceImages.length > 0 && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Reference{comp.referenceImages.length > 1 ? ` (${comp.referenceImages.length})` : ""}:
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {comp.referenceImages.map((img, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              className="group/ref cursor-pointer"
-                              onClick={() =>
-                                setViewingScreenshot({
-                                  url: img,
-                                  title: `${comp.name} — Reference ${i + 1}`,
-                                })
-                              }
-                            >
-                              <img
-                                src={img}
-                                alt={`Reference ${i + 1} for ${comp.name}`}
-                                className="rounded border h-12 w-12 object-cover group-hover/ref:opacity-80 transition-opacity"
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {comp.notes && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {comp.notes}
-                      </p>
-                    )}
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => recaptureCompetitor(comp.id)}
-                        disabled={capturingCompetitorId === comp.id}
-                        title="Recapture screenshot"
-                      >
-                        {capturingCompetitorId === comp.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={() => deleteCompetitor(comp.id)}
-                        disabled={capturingCompetitorId === comp.id}
-                        title="Delete competitor"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {comp.url}
+                    </p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           ) : !addingCompetitor ? (
