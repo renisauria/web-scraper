@@ -96,6 +96,12 @@ function SitemapTreeNode({
               <PriorityDot priority={node.metadata.priority} />
             )}
 
+            {hasChildren && (
+              <Badge variant="outline" className="text-[10px] py-0 px-1.5 text-muted-foreground font-normal">
+                {node.children.length}
+              </Badge>
+            )}
+
             {node.hasContent && variant === "current" && (
               <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
                 scraped

@@ -33,6 +33,7 @@ import {
   Maximize2,
   Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { Page, PageVersion, Project } from "@/types";
 
 function formatVersionDate(date: Date | string): string {
@@ -119,8 +120,11 @@ export default function PageDetailView({
       }
 
       await fetchPage();
+      toast.success("Page rescraped successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to re-scrape");
+      const msg = err instanceof Error ? err.message : "Failed to re-scrape";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setRescraping(false);
     }
@@ -142,8 +146,11 @@ export default function PageDetailView({
       }
 
       await fetchPage();
+      toast.success("Full-page screenshot captured");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to capture screenshot");
+      const msg = err instanceof Error ? err.message : "Failed to capture screenshot";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setCapturingFullPage(false);
     }
@@ -169,8 +176,11 @@ export default function PageDetailView({
       }
 
       await fetchPage();
+      toast.success("Version deleted");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete version");
+      const msg = err instanceof Error ? err.message : "Failed to delete version";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setDeletingVersionId(null);
     }

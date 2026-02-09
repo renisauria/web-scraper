@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 import Link from "next/link";
 
 export default function NewProjectPage() {
@@ -56,9 +57,12 @@ export default function NewProjectPage() {
         throw new Error(data.error || "Failed to create project");
       }
 
+      toast.success("Project created!");
       router.push(`/projects/${data.project.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

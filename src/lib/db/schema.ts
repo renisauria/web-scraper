@@ -114,3 +114,40 @@ export const competitors = sqliteTable("competitors", {
 
 export type Competitor = typeof competitors.$inferSelect;
 export type NewCompetitor = typeof competitors.$inferInsert;
+
+export const mockups = sqliteTable("mockups", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  prompt: text("prompt").notNull(),
+  image: text("image").notNull(),
+  label: text("label"),
+  style: text("style"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type Mockup = typeof mockups.$inferSelect;
+export type NewMockup = typeof mockups.$inferInsert;
+
+export const savedPrompts = sqliteTable("saved_prompts", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  prompt: text("prompt").notNull(),
+  style: text("style"),
+  pageType: text("page_type"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type SavedPrompt = typeof savedPrompts.$inferSelect;
+export type NewSavedPrompt = typeof savedPrompts.$inferInsert;

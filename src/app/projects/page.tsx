@@ -20,6 +20,7 @@ import {
   ExternalLink,
   Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { Project } from "@/types";
 
 export default function ProjectsPage() {
@@ -49,8 +50,10 @@ export default function ProjectsPage() {
     try {
       await fetch(`/api/projects/${id}`, { method: "DELETE" });
       setProjects(projects.filter((p) => p.id !== id));
+      toast.success("Project deleted");
     } catch (error) {
       console.error("Failed to delete project:", error);
+      toast.error("Failed to delete project");
     }
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,8 +21,10 @@ import {
   TreePine,
   Layers,
   Sparkles,
+  FileDown,
 } from "lucide-react";
 import { SitemapTree } from "@/components/sitemap-tree";
+import { toast } from "sonner";
 import type { SitemapData } from "@/types";
 
 type TabType = "current" | "recommended";
@@ -38,6 +40,7 @@ export default function SitemapPage({
   const [recommendedSitemap, setRecommendedSitemap] = useState<SitemapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchSitemaps = useCallback(async () => {
@@ -67,6 +70,8 @@ export default function SitemapPage({
   async function generateSitemap(type: TabType) {
     setError(null);
     setGenerating(true);
+    const label = type === "current" ? "sitemap" : "AI sitemap";
+    toast.info(`Generating ${label}...`);
 
     try {
       const response = await fetch("/api/sitemap", {
@@ -86,12 +91,98 @@ export default function SitemapPage({
       } else {
         setRecommendedSitemap(sitemapData);
       }
+      toast.success(`${type === "current" ? "Sitemap" : "AI sitemap"} generated`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate sitemap");
+      const msg = err instanceof Error ? err.message : "Failed to generate sitemap";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setGenerating(false);
     }
   }
+
+  async function importFromSitemapXml() {
+    setError(null);
+    setImporting(true);
+    toast.info("Fetching sitemap.xml...");
+
+    try {
+      const response = await fetch("/api/sitemap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: id, type: "current", source: "import-xml" }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to import sitemap.xml");
+      }
+
+      const sitemapData = result.sitemap.data as SitemapData;
+      setCurrentSitemap(sitemapData);
+      setActiveTab("current");
+
+      const stats = result.importStats;
+      if (stats) {
+        const subMsg = stats.childSitemapsFound > 0
+          ? ` (${stats.childSitemapsFound} sub-sitemaps)`
+          : "";
+        toast.success(`Imported ${stats.urlCount} pages from sitemap.xml${subMsg}`);
+      } else {
+        toast.success("Sitemap imported successfully");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to import sitemap.xml";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  const activeSitemap = activeTab === "current" ? currentSitemap : recommendedSitemap;
+
+  const sitemapStats = useMemo(() => {
+    if (!activeSitemap) return null;
+    const typeCount: Record<string, number> = {};
+    const depthCount: Record<number, number> = {};
+    let withContent = 0;
+    let total = 0;
+
+    function walk(node: SitemapData["rootNode"], depth: number) {
+      total++;
+      const pt = node.pageType || "other";
+      typeCount[pt] = (typeCount[pt] || 0) + 1;
+      depthCount[depth] = (depthCount[depth] || 0) + 1;
+      if (node.hasContent) withContent++;
+      for (const child of node.children) walk(child, depth + 1);
+    }
+    walk(activeSitemap.rootNode, 0);
+
+    const typeLabels: Record<string, string> = {
+      homepage: "Homepage",
+      collection: "Collections",
+      product: "Products",
+      page: "Pages",
+      blog: "Blogs",
+      article: "Articles",
+      other: "Other",
+    };
+
+    const types = Object.entries(typeCount)
+      .map(([key, count]) => ({ key, label: typeLabels[key] || key, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const maxTypeCount = Math.max(...types.map((t) => t.count), 1);
+
+    const depths = Object.entries(depthCount)
+      .map(([d, count]) => ({ depth: Number(d), count }))
+      .sort((a, b) => a.depth - b.depth);
+
+    const maxDepthCount = Math.max(...depths.map((d) => d.count), 1);
+
+    return { types, maxTypeCount, depths, maxDepthCount, withContent, total };
+  }, [activeSitemap]);
 
   if (loading) {
     return (
@@ -100,8 +191,6 @@ export default function SitemapPage({
       </div>
     );
   }
-
-  const activeSitemap = activeTab === "current" ? currentSitemap : recommendedSitemap;
 
   return (
     <div className="space-y-6">
@@ -168,7 +257,7 @@ export default function SitemapPage({
                 </div>
                 <Button
                   onClick={() => generateSitemap(activeTab)}
-                  disabled={generating}
+                  disabled={generating || importing}
                   size="sm"
                 >
                   {generating ? (
@@ -190,11 +279,18 @@ export default function SitemapPage({
             </CardHeader>
             <CardContent>
               {activeSitemap ? (
-                <SitemapTree
-                  node={activeSitemap.rootNode}
-                  variant={activeTab}
-                  defaultExpandDepth={3}
-                />
+                <div>
+                  <div className="flex items-center gap-2 mb-3 pb-3 border-b">
+                    <span className="text-sm text-muted-foreground">
+                      {activeSitemap.totalPages} {activeSitemap.totalPages === 1 ? "page" : "pages"} total
+                    </span>
+                  </div>
+                  <SitemapTree
+                    node={activeSitemap.rootNode}
+                    variant={activeTab}
+                    defaultExpandDepth={3}
+                  />
+                </div>
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
                   <Map className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -214,29 +310,119 @@ export default function SitemapPage({
 
         {/* Stats sidebar */}
         <div className="space-y-6">
-          {activeSitemap && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Stats</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total Pages</span>
-                  <Badge variant="secondary">{activeSitemap.totalPages}</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Max Depth</span>
-                  <Badge variant="secondary">{activeSitemap.maxDepth}</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Generated</span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(activeSitemap.generatedAt).toLocaleDateString()}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+          {sitemapStats && (
+            <>
+              {/* Page Type Breakdown */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Page Types</CardTitle>
+                  <CardDescription className="text-xs">
+                    {sitemapStats.total} pages across {sitemapStats.types.length} types
+                    {activeSitemap && (
+                      <span className="block mt-1 text-muted-foreground/70">
+                        Collected {new Date(activeSitemap.generatedAt).toLocaleDateString()} at{" "}
+                        {new Date(activeSitemap.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2.5">
+                  {sitemapStats.types.map(({ key, label, count }) => (
+                    <div key={key} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{label}</span>
+                        <span className="font-medium tabular-nums">{count}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary/60 transition-all"
+                          style={{ width: `${(count / sitemapStats.maxTypeCount) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Depth Distribution */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Depth Distribution</CardTitle>
+                  <CardDescription className="text-xs">
+                    Pages per level in the URL hierarchy
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2.5">
+                  {sitemapStats.depths.map(({ depth, count }) => (
+                    <div key={depth} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          {depth === 0 ? "Root" : `Level ${depth}`}
+                        </span>
+                        <span className="font-medium tabular-nums">{count}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary/40 transition-all"
+                          style={{ width: `${(count / sitemapStats.maxDepthCount) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Content Coverage */}
+              {sitemapStats.withContent > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Content Coverage</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Scraped</span>
+                      <Badge variant="secondary">{sitemapStats.withContent} / {sitemapStats.total}</Badge>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-green-500/70 transition-all"
+                        style={{ width: `${(sitemapStats.withContent / sitemapStats.total) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {Math.round((sitemapStats.withContent / sitemapStats.total) * 100)}% of pages have scraped content
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
+
+          {/* Import from sitemap.xml */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Import from sitemap.xml</CardTitle>
+              <CardDescription className="text-xs">
+                Fetch the site&apos;s sitemap.xml to build the full URL tree instantly, no scraping needed
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                onClick={importFromSitemapXml}
+                disabled={importing || generating}
+                className="w-full"
+                variant="outline"
+                size="sm"
+              >
+                {importing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileDown className="h-4 w-4 mr-2" />
+                )}
+                {importing ? "Importing..." : "Import Sitemap"}
+              </Button>
+            </CardContent>
+          </Card>
 
           {/* AI Rationale card - only for recommended */}
           {activeTab === "recommended" && recommendedSitemap?.aiRationale && (

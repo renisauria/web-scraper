@@ -250,3 +250,24 @@ export interface SitemapType {
   data: SitemapData;
   createdAt: Date;
 }
+
+export interface Mockup {
+  id: string;
+  projectId: string;
+  prompt: string;
+  image: string;
+  label: string | null;
+  style: string | null;
+  createdAt: Date;
+}
+
+export interface SavedPrompt {
+  id: string;
+  projectId: string;
+  name: string;
+  prompt: string;
+  style: string | null;
+  pageType: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}

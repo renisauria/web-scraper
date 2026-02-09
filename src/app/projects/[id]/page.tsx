@@ -42,8 +42,14 @@ import {
   Upload,
   ClipboardList,
   StickyNote,
+  Wand2,
+  Sparkles,
+  BookmarkPlus,
+  BookMarked,
+  ChevronDown,
 } from "lucide-react";
-import type { Project, Page, Analysis, Competitor, CompetitorType } from "@/types";
+import { toast } from "sonner";
+import type { Project, Page, Analysis, Competitor, CompetitorType, Mockup, SavedPrompt } from "@/types";
 import { AnalysisModal } from "@/components/analysis-modal";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { MarkdownViewer } from "@/components/ui/markdown-viewer";
@@ -53,6 +59,8 @@ interface ProjectData {
   pages: Page[];
   analyses: Analysis[];
   competitors: Competitor[];
+  mockups: Mockup[];
+  savedPrompts: SavedPrompt[];
 }
 
 export default function ProjectDetailPage({
@@ -70,6 +78,8 @@ export default function ProjectDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [singleUrl, setSingleUrl] = useState("");
   const [scrapingSingle, setScrapingSingle] = useState(false);
+  const [scrapeLimit, setScrapeLimit] = useState(50);
+  const [scrapeDepth, setScrapeDepth] = useState(3);
   const [editingContext, setEditingContext] = useState(false);
   const [contextForm, setContextForm] = useState({ clientProblems: "", competitorAnalysis: "", projectRequirements: "", clientNotes: "" });
   const [savingContext, setSavingContext] = useState(false);
@@ -84,6 +94,23 @@ export default function ProjectDetailPage({
   const [savingCompetitorEdit, setSavingCompetitorEdit] = useState(false);
   const [editReferenceImages, setEditReferenceImages] = useState<string[]>([]);
   const [viewingScreenshot, setViewingScreenshot] = useState<{ url: string; title: string } | null>(null);
+  const [showMockupForm, setShowMockupForm] = useState(false);
+  const [mockupStyle, setMockupStyle] = useState("Modern Minimal");
+  const [mockupPageType, setMockupPageType] = useState("Homepage");
+  const [mockupCustomPrompt, setMockupCustomPrompt] = useState("");
+  const [generatingPrompt, setGeneratingPrompt] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [generatedPrompt, setGeneratedPrompt] = useState("");
+  const [editedPrompt, setEditedPrompt] = useState("");
+  const [mockupRefImages, setMockupRefImages] = useState<string[]>([]);
+  const [mockupStyleRef, setMockupStyleRef] = useState("");
+  const [savingPrompt, setSavingPrompt] = useState(false);
+  const [promptName, setPromptName] = useState("");
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
+  const [savedPromptSuccess, setSavedPromptSuccess] = useState(false);
+  const [showLoadPrompt, setShowLoadPrompt] = useState(false);
+  const [renamingPromptId, setRenamingPromptId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   const fetchProject = useCallback(async () => {
     try {
@@ -119,7 +146,7 @@ export default function ProjectDetailPage({
       const response = await fetch("/api/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: id }),
+        body: JSON.stringify({ projectId: id, limit: scrapeLimit, maxDepth: scrapeDepth }),
       });
 
       const result = await response.json();
@@ -127,6 +154,8 @@ export default function ProjectDetailPage({
       if (!response.ok) {
         throw new Error(result.error || "Failed to start scraping");
       }
+
+      toast.info("Crawl started...");
 
       // Poll for status
       const pollStatus = async (): Promise<void> => {
@@ -151,6 +180,7 @@ export default function ProjectDetailPage({
         if (statusResult.status === "completed") {
           // Done! Refresh project data
           await fetchProject();
+          toast.success(`Scraping complete! ${statusResult.completed} pages found`);
           return;
         }
 
@@ -161,7 +191,9 @@ export default function ProjectDetailPage({
 
       await pollStatus();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Scraping failed");
+      const msg = err instanceof Error ? err.message : "Scraping failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setScraping(false);
       setScrapeProgress(null);
@@ -171,6 +203,7 @@ export default function ProjectDetailPage({
   async function startAnalysis() {
     setError(null);
     setAnalyzing(true);
+    toast.info("Running AI analysis...");
 
     try {
       const response = await fetch("/api/analyze", {
@@ -186,8 +219,11 @@ export default function ProjectDetailPage({
       }
 
       await fetchProject();
+      toast.success("Analysis complete!");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Analysis failed");
+      const msg = err instanceof Error ? err.message : "Analysis failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setAnalyzing(false);
     }
@@ -214,8 +250,11 @@ export default function ProjectDetailPage({
 
       setSingleUrl("");
       await fetchProject();
+      toast.success("Page added successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to scrape URL");
+      const msg = err instanceof Error ? err.message : "Failed to scrape URL";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setScrapingSingle(false);
     }
@@ -247,8 +286,11 @@ export default function ProjectDetailPage({
       if (!response.ok) throw new Error("Failed to save");
       await fetchProject();
       setEditingContext(false);
+      toast.success("Client context saved");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save context");
+      const msg = err instanceof Error ? err.message : "Failed to save context";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSavingContext(false);
     }
@@ -286,8 +328,11 @@ export default function ProjectDetailPage({
       setReferenceImages([]);
       setAddingCompetitor(false);
       await fetchProject();
+      toast.success("Competitor added");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add competitor");
+      const msg = err instanceof Error ? err.message : "Failed to add competitor";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSavingCompetitor(false);
     }
@@ -312,8 +357,11 @@ export default function ProjectDetailPage({
         setViewingCompetitor(result.competitor);
       }
       await fetchProject();
+      toast.success("Screenshot recaptured");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to recapture screenshot");
+      const msg = err instanceof Error ? err.message : "Failed to recapture screenshot";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setCapturingCompetitorId(null);
     }
@@ -333,8 +381,11 @@ export default function ProjectDetailPage({
       }
 
       await fetchProject();
+      toast.success("Competitor deleted");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete competitor");
+      const msg = err instanceof Error ? err.message : "Failed to delete competitor";
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -380,10 +431,221 @@ export default function ProjectDetailPage({
       setViewingCompetitor(result.competitor);
       setEditingCompetitor(false);
       await fetchProject();
+      toast.success("Competitor updated");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save changes");
+      const msg = err instanceof Error ? err.message : "Failed to save changes";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSavingCompetitorEdit(false);
+    }
+  }
+
+  async function handleGeneratePrompt() {
+    setError(null);
+    setGeneratingPrompt(true);
+
+    try {
+      const response = await fetch("/api/mockups/generate-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: id,
+          style: mockupStyle,
+          pageType: mockupPageType,
+          customInstructions: mockupCustomPrompt.trim() || undefined,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to generate prompt");
+      }
+
+      setGeneratedPrompt(result.prompt);
+      setEditedPrompt(result.prompt);
+      setShowMockupForm(false);
+      toast.success("Prompt generated");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to generate prompt";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setGeneratingPrompt(false);
+    }
+  }
+
+  async function handleGenerateImage() {
+    setError(null);
+    setGeneratingImage(true);
+
+    try {
+      // Append style references to the prompt if provided
+      let finalPrompt = editedPrompt;
+      if (mockupStyleRef.trim()) {
+        finalPrompt += `\n\nAdditional style references:\n${mockupStyleRef.trim()}`;
+      }
+
+      const response = await fetch("/api/mockups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: id,
+          prompt: finalPrompt,
+          label: mockupPageType,
+          style: mockupStyle,
+          extraReferenceImages: mockupRefImages.length > 0 ? mockupRefImages : undefined,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to generate mockup");
+      }
+
+      setGeneratedPrompt("");
+      setEditedPrompt("");
+      setMockupCustomPrompt("");
+      setMockupRefImages([]);
+      setMockupStyleRef("");
+      await fetchProject();
+      toast.success("Mockup generated!");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to generate mockup";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setGeneratingImage(false);
+    }
+  }
+
+  async function deleteMockup(mockupId: string) {
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/mockups/${mockupId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Failed to delete mockup");
+      }
+
+      await fetchProject();
+      toast.success("Mockup deleted");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to delete mockup";
+      setError(msg);
+      toast.error(msg);
+    }
+  }
+
+  async function handleSavePrompt() {
+    if (!promptName.trim() || !editedPrompt.trim()) return;
+    setSavingPrompt(true);
+    setSavedPromptSuccess(false);
+
+    try {
+      const response = await fetch("/api/saved-prompts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: id,
+          name: promptName.trim(),
+          prompt: editedPrompt,
+          style: mockupStyle || undefined,
+          pageType: mockupPageType || undefined,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to save prompt");
+      }
+
+      setPromptName("");
+      setShowSavePrompt(false);
+      setSavedPromptSuccess(true);
+      setTimeout(() => setSavedPromptSuccess(false), 2000);
+      await fetchProject();
+      toast.success("Prompt saved");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to save prompt";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setSavingPrompt(false);
+    }
+  }
+
+  function loadSavedPrompt(sp: SavedPrompt) {
+    setEditedPrompt(sp.prompt);
+    if (sp.style) setMockupStyle(sp.style);
+    if (sp.pageType) setMockupPageType(sp.pageType);
+    setShowLoadPrompt(false);
+    // Make sure we're in the prompt review step
+    if (!generatedPrompt) {
+      setGeneratedPrompt(sp.prompt);
+    }
+  }
+
+  function loadPromptFromMockup(mockup: Mockup) {
+    setEditedPrompt(mockup.prompt);
+    if (mockup.style) setMockupStyle(mockup.style);
+    if (mockup.label) setMockupPageType(mockup.label);
+    setShowLoadPrompt(false);
+    if (!generatedPrompt) {
+      setGeneratedPrompt(mockup.prompt);
+    }
+  }
+
+  async function renameSavedPrompt(promptId: string) {
+    if (!renameValue.trim()) return;
+
+    try {
+      const response = await fetch(`/api/saved-prompts/${promptId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: renameValue.trim() }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Failed to rename prompt");
+      }
+
+      setRenamingPromptId(null);
+      setRenameValue("");
+      await fetchProject();
+      toast.success("Prompt renamed");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to rename prompt";
+      setError(msg);
+      toast.error(msg);
+    }
+  }
+
+  async function deleteSavedPrompt(promptId: string) {
+    try {
+      const response = await fetch(`/api/saved-prompts/${promptId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Failed to delete prompt");
+      }
+
+      await fetchProject();
+      toast.success("Prompt deleted");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to delete prompt";
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -404,7 +666,7 @@ export default function ProjectDetailPage({
     );
   }
 
-  const { project, pages, analyses, competitors } = data;
+  const { project, pages, analyses, competitors, mockups, savedPrompts } = data;
 
   // Sort pages: homepage first, then by URL depth and alphabetically
   const sortedPages = [...pages].sort((a, b) => {
@@ -917,6 +1179,38 @@ export default function ProjectDetailPage({
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Crawl Website
               </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Page limit</label>
+                  <select
+                    value={scrapeLimit}
+                    onChange={(e) => setScrapeLimit(Number(e.target.value))}
+                    disabled={scraping || analyzing || scrapingSingle}
+                    className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  >
+                    <option value={10}>10 pages</option>
+                    <option value={25}>25 pages</option>
+                    <option value={50}>50 pages</option>
+                    <option value={100}>100 pages</option>
+                    <option value={200}>200 pages</option>
+                    <option value={500}>500 pages</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Crawl depth</label>
+                  <select
+                    value={scrapeDepth}
+                    onChange={(e) => setScrapeDepth(Number(e.target.value))}
+                    disabled={scraping || analyzing || scrapingSingle}
+                    className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  >
+                    <option value={2}>2 levels</option>
+                    <option value={3}>3 levels</option>
+                    <option value={4}>4 levels</option>
+                    <option value={5}>5 levels</option>
+                  </select>
+                </div>
+              </div>
               <Button
                 onClick={startScraping}
                 disabled={scraping || analyzing || scrapingSingle}
@@ -954,7 +1248,7 @@ export default function ProjectDetailPage({
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Crawls up to 10 pages and captures screenshots
+                  Crawls up to {scrapeLimit} pages, {scrapeDepth} levels deep
                 </p>
               )}
             </div>
@@ -1431,6 +1725,492 @@ export default function ProjectDetailPage({
               className="w-full p-4 rounded-lg border border-dashed text-sm text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors text-center"
             >
               Add competitor or inspiration sites to capture screenshots for reference
+            </button>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                AI Mockups
+              </CardTitle>
+              <CardDescription>
+                Generate website look & feel proposals based on your analysis
+              </CardDescription>
+            </div>
+            {!showMockupForm && !generatedPrompt && !generatingPrompt && !generatingImage && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMockupForm(true)}
+              >
+                <Wand2 className="h-4 w-4 mr-2" />
+                Generate Mockup
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Step 1: Settings Form */}
+          {showMockupForm && (
+            <div className="space-y-3 mb-6 p-4 rounded-lg border bg-muted/30">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Style Preset</label>
+                <select
+                  value={mockupStyle}
+                  onChange={(e) => setMockupStyle(e.target.value)}
+                  disabled={generatingPrompt}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="Modern Minimal">Modern Minimal</option>
+                  <option value="Bold & Dark">Bold & Dark</option>
+                  <option value="Playful & Colorful">Playful & Colorful</option>
+                  <option value="Corporate Clean">Corporate Clean</option>
+                  <option value="Luxury & Elegant">Luxury & Elegant</option>
+                  <option value="Retrowave">Retrowave</option>
+                  <option value="Futuristic">Futuristic</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Page Type</label>
+                <select
+                  value={mockupPageType}
+                  onChange={(e) => setMockupPageType(e.target.value)}
+                  disabled={generatingPrompt}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="Homepage">Homepage</option>
+                  <option value="Product Page">Product Page</option>
+                  <option value="Collection Page">Collection Page</option>
+                  <option value="About Page">About Page</option>
+                  <option value="Contact Page">Contact Page</option>
+                  <option value="Blog Page">Blog Page</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Custom Instructions (optional)</label>
+                <Textarea
+                  placeholder="e.g. Use a hero section with a large product image, include a trust badges section..."
+                  value={mockupCustomPrompt}
+                  onChange={(e) => setMockupCustomPrompt(e.target.value)}
+                  rows={3}
+                  disabled={generatingPrompt}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleGeneratePrompt}
+                  disabled={generatingPrompt}
+                  size="sm"
+                >
+                  {generatingPrompt ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Wand2 className="h-4 w-4 mr-2" />
+                  )}
+                  {generatingPrompt ? "Crafting Prompt..." : "Generate Prompt"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowMockupForm(false);
+                    setMockupCustomPrompt("");
+                  }}
+                  disabled={generatingPrompt}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Prompt Review / Edit */}
+          {generatedPrompt && !generatingImage && (
+            <div className="space-y-4 mb-6 p-4 rounded-lg border bg-muted/30">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">AI-Generated Image Prompt</h3>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                    {mockupPageType}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    {mockupStyle}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Load Saved Prompt */}
+              {(savedPrompts.length > 0 || mockups.length > 0) && (
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowLoadPrompt(!showLoadPrompt)}
+                    className="w-full justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <BookMarked className="h-4 w-4" />
+                      Load Saved Prompt
+                    </span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showLoadPrompt ? "rotate-180" : ""}`} />
+                  </Button>
+                  {showLoadPrompt && (
+                    <div className="absolute z-10 mt-1 w-full rounded-md border bg-background shadow-lg max-h-64 overflow-y-auto">
+                      {savedPrompts.length > 0 && (
+                        <div>
+                          <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50">
+                            Saved Prompts
+                          </p>
+                          {savedPrompts.map((sp) => (
+                            <div
+                              key={sp.id}
+                              className="flex items-center justify-between px-3 py-2 hover:bg-muted/50 group"
+                            >
+                              {renamingPromptId === sp.id ? (
+                                <div className="flex items-center gap-1 flex-1 mr-2">
+                                  <Input
+                                    value={renameValue}
+                                    onChange={(e) => setRenameValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") renameSavedPrompt(sp.id);
+                                      if (e.key === "Escape") { setRenamingPromptId(null); setRenameValue(""); }
+                                    }}
+                                    className="h-7 text-sm"
+                                    autoFocus
+                                  />
+                                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => renameSavedPrompt(sp.id)}>
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setRenamingPromptId(null); setRenameValue(""); }}>
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="flex-1 text-left"
+                                    onClick={() => loadSavedPrompt(sp)}
+                                  >
+                                    <p className="text-sm font-medium truncate">{sp.name}</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                      {sp.pageType && <span>{sp.pageType}</span>}
+                                      {sp.pageType && sp.style && <span> · </span>}
+                                      {sp.style && <span>{sp.style}</span>}
+                                      {(sp.pageType || sp.style) && <span> · </span>}
+                                      {new Date(sp.updatedAt).toLocaleDateString()}
+                                    </p>
+                                  </button>
+                                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      type="button"
+                                      className="h-6 w-6 rounded flex items-center justify-center hover:bg-muted"
+                                      onClick={(e) => { e.stopPropagation(); setRenamingPromptId(sp.id); setRenameValue(sp.name); }}
+                                      title="Rename"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10 text-destructive"
+                                      onClick={(e) => { e.stopPropagation(); deleteSavedPrompt(sp.id); }}
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {mockups.length > 0 && (
+                        <div>
+                          <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50">
+                            From Previous Mockups
+                          </p>
+                          {mockups.map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              className="w-full text-left px-3 py-2 hover:bg-muted/50"
+                              onClick={() => loadPromptFromMockup(m)}
+                            >
+                              <p className="text-sm font-medium truncate">
+                                {m.label || "Mockup"} — {m.style || "Custom"}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {new Date(m.createdAt).toLocaleDateString()} at{" "}
+                                {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Review and edit the prompt below before generating the image
+              </p>
+              <Textarea
+                value={editedPrompt}
+                onChange={(e) => setEditedPrompt(e.target.value)}
+                rows={14}
+                className="font-mono text-sm"
+              />
+
+              <Separator />
+
+              {/* Visual References */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4" />
+                  Visual References (optional)
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Upload images to send as visual style references alongside the prompt
+                </p>
+                {mockupRefImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {mockupRefImages.map((img, i) => (
+                      <div key={i} className="relative group/thumb">
+                        <img
+                          src={img}
+                          alt={`Reference ${i + 1}`}
+                          className="rounded-md border h-20 w-20 object-cover"
+                        />
+                        <button
+                          type="button"
+                          className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center text-xs opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                          onClick={() =>
+                            setMockupRefImages((prev) => prev.filter((_, j) => j !== i))
+                          }
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm cursor-pointer hover:bg-muted/50 transition-colors w-fit">
+                  <Upload className="h-4 w-4 text-muted-foreground" />
+                  <span>Upload images</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      files.forEach((file) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setMockupRefImages((prev) => [...prev, reader.result as string]);
+                        };
+                        reader.readAsDataURL(file);
+                      });
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+
+              {/* Style References (text) */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Pencil className="h-4 w-4" />
+                  Style References (optional)
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Add text-based style notes — these will be appended to the prompt before image generation
+                </p>
+                <Textarea
+                  placeholder="e.g. Use a warm earth-tone palette like Aesop.com, rounded corners on all cards, large white space between sections, editorial photography style..."
+                  value={mockupStyleRef}
+                  onChange={(e) => setMockupStyleRef(e.target.value)}
+                  rows={3}
+                />
+              </div>
+
+              <Separator />
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={handleGenerateImage}
+                  disabled={!editedPrompt.trim()}
+                  size="sm"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate Image
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGeneratePrompt}
+                  disabled={generatingPrompt}
+                >
+                  {generatingPrompt ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
+                  Regenerate Prompt
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setGeneratedPrompt("");
+                    setEditedPrompt("");
+                    setMockupRefImages([]);
+                    setMockupStyleRef("");
+                    setShowMockupForm(true);
+                  }}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Settings
+                </Button>
+
+                <div className="ml-auto flex items-center gap-2">
+                  {savedPromptSuccess && (
+                    <span className="text-xs text-green-600 flex items-center gap-1">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Saved
+                    </span>
+                  )}
+                  {showSavePrompt ? (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        placeholder="Prompt name..."
+                        value={promptName}
+                        onChange={(e) => setPromptName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !savingPrompt) handleSavePrompt();
+                          if (e.key === "Escape") { setShowSavePrompt(false); setPromptName(""); }
+                        }}
+                        disabled={savingPrompt}
+                        className="h-8 w-48 text-sm"
+                        autoFocus
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleSavePrompt}
+                        disabled={!promptName.trim() || savingPrompt}
+                        className="h-8"
+                      >
+                        {savingPrompt ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Save className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { setShowSavePrompt(false); setPromptName(""); }}
+                        disabled={savingPrompt}
+                        className="h-8"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowSavePrompt(true)}
+                      disabled={!editedPrompt.trim()}
+                    >
+                      <BookmarkPlus className="h-4 w-4 mr-2" />
+                      Save Prompt
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Generating image spinner */}
+          {generatingImage && (
+            <div className="flex flex-col items-center justify-center p-8 gap-3 mb-6">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Generating mockup image... This may take a moment.</p>
+            </div>
+          )}
+
+          {mockups.length > 0 ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {mockups.map((mockup) => (
+                <div
+                  key={mockup.id}
+                  className="group relative flex flex-col rounded-lg border overflow-hidden hover:border-primary/50 hover:shadow-md transition-all"
+                >
+                  <button
+                    type="button"
+                    className="text-left"
+                    onClick={() =>
+                      setViewingScreenshot({
+                        url: mockup.image,
+                        title: `${mockup.label || "Mockup"} — ${mockup.style || "Custom"}`,
+                      })
+                    }
+                  >
+                    <div className="relative aspect-video bg-muted overflow-hidden">
+                      <img
+                        src={mockup.image}
+                        alt={`Mockup: ${mockup.label || "AI Generated"}`}
+                        className="w-full h-full object-cover object-top transition-transform group-hover:scale-105"
+                      />
+                    </div>
+                    <div className="p-3 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {mockup.label && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            {mockup.label}
+                          </Badge>
+                        )}
+                        {mockup.style && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {mockup.style}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(mockup.createdAt).toLocaleDateString()} at{" "}
+                        {new Date(mockup.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteMockup(mockup.id);
+                    }}
+                    title="Delete mockup"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : !showMockupForm && !generatedPrompt && !generatingPrompt && !generatingImage ? (
+            <button
+              onClick={() => setShowMockupForm(true)}
+              className="w-full p-4 rounded-lg border border-dashed text-sm text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors text-center"
+            >
+              Generate AI mockups based on your analysis and competitor research
             </button>
           ) : null}
         </CardContent>

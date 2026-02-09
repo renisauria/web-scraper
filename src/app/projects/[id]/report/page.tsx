@@ -27,6 +27,7 @@ import {
   Zap,
   Lightbulb,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { Project, Analysis } from "@/types";
 
 interface ProjectData {
@@ -216,6 +217,7 @@ export default function ReportPage({
     await navigator.clipboard.writeText(markdown);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    toast.success("Report copied to clipboard");
   }
 
   function downloadMarkdown() {

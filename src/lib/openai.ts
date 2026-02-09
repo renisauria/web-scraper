@@ -210,6 +210,139 @@ export async function analyzeContent(
   }
 }
 
+export async function generateMockupPrompt(
+  project: {
+    name: string;
+    url: string;
+    clientProblems?: string | null;
+    competitorAnalysis?: string | null;
+    projectRequirements?: string | null;
+    clientNotes?: string | null;
+  },
+  analyses: { type: string; content: Record<string, unknown> | null }[],
+  competitors: { name: string; url: string; notes?: string | null }[],
+  options: { style: string; pageType: string; customInstructions?: string }
+): Promise<{ prompt: string }> {
+  const systemPrompt = `You are an elite prompt engineer specializing in crafting image-generation prompts for AI models like Google Gemini Imagen. Your job is to take project context and produce a single, hyper-detailed image prompt that will generate a stunning, realistic website mockup screenshot.
+
+RULES FOR THE PROMPT YOU WRITE:
+1. USE CONCRETE VISUAL LANGUAGE ONLY — never say "professional feel" or "modern look". Instead say "navy blue navigation bar with white 14px sans-serif text, left-aligned logo, right-aligned menu links spaced 32px apart".
+2. SPECIFY EXACT LAYOUT — describe sections top-to-bottom: navigation, hero, features grid, testimonials, CTA banner, footer. State grid structures (e.g. "3-column card grid with 24px gaps").
+3. INCLUDE COLOR PALETTE — use hex codes. E.g. "primary: #1a1a2e, accent: #e94560, background: #f5f5f5, text: #333333".
+4. DESCRIBE TYPOGRAPHY — mention weight (bold, semibold, regular), style (sans-serif, serif), and relative sizes (e.g. "hero headline 48px bold sans-serif, subheadline 20px regular").
+5. NAME SPECIFIC UI COMPONENTS — hero section, sticky navbar, product cards, testimonial carousel, CTA buttons with rounded corners, icon grid, trust badges, newsletter signup, multi-column footer with social icons.
+6. SPECIFY FRAMING — "Desktop browser screenshot at 1440px width, shown in a clean browser chrome frame" or "Full-page website screenshot without browser chrome".
+7. INCLUDE NEGATIVE GUIDANCE — "Not a wireframe. Not a low-fidelity sketch. No lorem ipsum placeholder text — use realistic English copy. No watermarks. No UI kit component sheets."
+8. ANCHOR QUALITY — "Awwwards-quality design. Behance featured project level. Pixel-perfect rendering."
+9. INCLUDE REALISTIC CONTENT — suggest actual headline text, button labels, and section copy that match the brand.
+10. USE ALL PROVIDED CONTEXT — you MUST incorporate the client's problems, competitor analysis, project requirements, client notes, and AI analysis insights into the visual design. For example, if the client wants better CTAs, describe specific CTA button designs. If analysis mentions poor navigation, describe an improved nav. If competitors are mentioned, reference their visual strengths. The prompt must reflect the SPECIFIC business, not a generic website.
+
+Return a JSON object with a single key "prompt" containing the complete image-generation prompt as a string. The prompt should be 400-800 words.`;
+
+  // Assemble all project context
+  const contextParts: string[] = [];
+  contextParts.push(`Website: "${project.name}" (${project.url})`);
+  contextParts.push(`Design Style: ${options.style}`);
+  contextParts.push(`Page Type: ${options.pageType}`);
+
+  if (project.clientProblems) {
+    contextParts.push(`Client Problems:\n${project.clientProblems.slice(0, 2000)}`);
+  }
+  if (project.competitorAnalysis) {
+    contextParts.push(`Competitor Analysis & Desired Features:\n${project.competitorAnalysis.slice(0, 2000)}`);
+  }
+  if (project.projectRequirements) {
+    contextParts.push(`Project Requirements:\n${project.projectRequirements.slice(0, 2000)}`);
+  }
+  if (project.clientNotes) {
+    contextParts.push(`Client Notes:\n${project.clientNotes.slice(0, 1000)}`);
+  }
+
+  // Extract rich detail from each analysis type
+  for (const analysis of analyses) {
+    let content = analysis.content;
+    if (!content) continue;
+    // Handle case where content is stored as string
+    if (typeof content === "string") {
+      try { content = JSON.parse(content); } catch { continue; }
+    }
+    const c = content as Record<string, unknown>;
+
+    const parts: string[] = [];
+    // Always include summary
+    const summary = (c.summary as string) || (c.overview as string);
+    if (summary) parts.push(summary);
+
+    // Extract key details per analysis type
+    if (analysis.type === "marketing") {
+      const vp = c.valueProposition as Record<string, unknown> | undefined;
+      if (vp?.identified) parts.push(`Value proposition: ${vp.identified}`);
+      const msg = c.messaging as Record<string, unknown> | undefined;
+      if (msg?.tone) parts.push(`Tone: ${msg.tone}`);
+      if (msg?.targetAudience) parts.push(`Target audience: ${msg.targetAudience}`);
+      const ctas = c.ctas as Record<string, unknown> | undefined;
+      if (ctas?.found && Array.isArray(ctas.found)) parts.push(`CTAs: ${(ctas.found as string[]).join(", ")}`);
+    } else if (analysis.type === "architecture") {
+      const nav = c.navigation as Record<string, unknown> | undefined;
+      if (nav?.items && Array.isArray(nav.items)) parts.push(`Nav items: ${(nav.items as string[]).join(", ")}`);
+      const structure = c.siteStructure as Record<string, unknown> | undefined;
+      if (structure?.mainSections && Array.isArray(structure.mainSections)) parts.push(`Main sections: ${(structure.mainSections as string[]).join(", ")}`);
+    } else if (analysis.type === "recommendations") {
+      const qw = c.quickWins as Record<string, unknown> | undefined;
+      if (qw?.items && Array.isArray(qw.items)) {
+        const titles = (qw.items as { title: string }[]).map(i => i.title).slice(0, 5);
+        parts.push(`Quick wins: ${titles.join(", ")}`);
+      }
+    }
+
+    if (parts.length > 0) {
+      contextParts.push(`${analysis.type} analysis:\n${parts.join("\n").slice(0, 600)}`);
+    }
+  }
+
+  // Add competitor context with preferred features
+  const competitorDetails = competitors.slice(0, 5).map((c) => {
+    const detail = [`${c.name} (${c.url})`];
+    const comp = c as Record<string, unknown>;
+    if (comp.preferredFeature) detail.push(`preferred feature: ${comp.preferredFeature}`);
+    if (comp.notes) detail.push(`notes: ${(comp.notes as string).slice(0, 150)}`);
+    return detail.join(" — ");
+  });
+  if (competitorDetails.length > 0) {
+    contextParts.push(`Competitor/inspiration sites:\n${competitorDetails.join("\n")}`);
+  }
+
+  if (options.customInstructions) {
+    contextParts.push(`Custom Instructions: ${options.customInstructions}`);
+  }
+
+  const userPrompt = `Based on the following project context, craft the perfect image-generation prompt for a ${options.pageType} mockup in the "${options.style}" style.\n\n${contextParts.join("\n\n")}`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4-turbo-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.8,
+      max_tokens: 2000,
+    });
+
+    const responseContent = completion.choices[0]?.message?.content;
+    if (!responseContent) {
+      throw new Error("No response from OpenAI");
+    }
+
+    const parsed = JSON.parse(responseContent);
+    return { prompt: parsed.prompt || responseContent };
+  } catch (error) {
+    console.error("OpenAI mockup prompt generation error:", error);
+    throw error;
+  }
+}
+
 export async function generateRecommendedSitemap(
   currentSitemap: Record<string, unknown>,
   pageContent: string,

@@ -6,7 +6,7 @@ import { z } from "zod";
 
 const scrapeSchema = z.object({
   projectId: z.string().uuid("Valid project ID is required"),
-  limit: z.number().min(1).max(50).optional().default(10),
+  limit: z.number().min(1).max(500).optional().default(10),
   maxDepth: z.number().min(1).max(5).optional().default(2),
 });
 

@@ -22,24 +22,25 @@ function labelFromSegment(segment: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function buildCurrentSitemap(
-  pages: Page[],
+/**
+ * Build a sitemap tree from raw URL strings. All nodes get hasContent: false.
+ */
+export function buildSitemapFromUrls(
+  urls: string[],
   projectUrl: string
 ): SitemapData {
   const baseUrl = new URL(projectUrl);
   const baseHost = baseUrl.hostname;
 
-  // Build a map of path -> node
   const nodeMap = new Map<string, SitemapNode>();
-  const scrapedPaths = new Set<string>();
+  const paths = new Set<string>();
 
-  // Track which pages we've seen
-  for (const page of pages) {
+  for (const rawUrl of urls) {
     try {
-      const parsed = new URL(page.url);
+      const parsed = new URL(rawUrl);
       if (parsed.hostname !== baseHost) continue;
       const pathname = parsed.pathname.replace(/\/$/, "") || "/";
-      scrapedPaths.add(pathname);
+      paths.add(pathname);
     } catch {
       // skip invalid URLs
     }
@@ -52,26 +53,13 @@ export function buildCurrentSitemap(
     path: "/",
     url: projectUrl,
     pageType: "homepage",
-    hasContent: scrapedPaths.has("/"),
+    hasContent: false,
     children: [],
-    metadata: {
-      title: pages.find((p) => {
-        try {
-          const parsed = new URL(p.url);
-          const pathname = parsed.pathname.replace(/\/$/, "") || "/";
-          return pathname === "/" && parsed.hostname === baseHost;
-        } catch {
-          return false;
-        }
-      })?.title || undefined,
-    },
   };
   nodeMap.set("/", rootNode);
 
-  // Collect all unique paths (from scraped pages)
-  const allPaths = Array.from(scrapedPaths).sort();
+  const allPaths = Array.from(paths).sort();
 
-  // Build tree by ensuring all intermediate nodes exist
   for (const pathname of allPaths) {
     if (pathname === "/") continue;
 
@@ -83,32 +71,18 @@ export function buildCurrentSitemap(
       currentPath = "/" + segments.slice(0, i + 1).join("/");
 
       if (!nodeMap.has(currentPath)) {
-        const page = pages.find((p) => {
-          try {
-            const parsed = new URL(p.url);
-            const pPath = parsed.pathname.replace(/\/$/, "") || "/";
-            return pPath === currentPath && parsed.hostname === baseHost;
-          } catch {
-            return false;
-          }
-        });
-
         const node: SitemapNode = {
           id: uuidv4(),
           label: labelFromSegment(segments[i]),
           path: currentPath,
-          url: page ? page.url : `${baseUrl.origin}${currentPath}`,
+          url: `${baseUrl.origin}${currentPath}`,
           pageType: inferPageType(currentPath),
-          hasContent: scrapedPaths.has(currentPath),
+          hasContent: false,
           children: [],
-          metadata: {
-            title: page?.title || undefined,
-          },
         };
 
         nodeMap.set(currentPath, node);
 
-        // Attach to parent
         const parentNode = nodeMap.get(parentPath);
         if (parentNode) {
           parentNode.children.push(node);
@@ -136,4 +110,50 @@ export function buildCurrentSitemap(
     generatedAt: new Date().toISOString(),
     projectUrl,
   };
+}
+
+export function buildCurrentSitemap(
+  pages: Page[],
+  projectUrl: string
+): SitemapData {
+  const baseUrl = new URL(projectUrl);
+  const baseHost = baseUrl.hostname;
+
+  // Build a map of path -> page for metadata lookup
+  const pageByPath = new Map<string, Page>();
+  const urls: string[] = [];
+
+  for (const page of pages) {
+    try {
+      const parsed = new URL(page.url);
+      if (parsed.hostname !== baseHost) continue;
+      const pathname = parsed.pathname.replace(/\/$/, "") || "/";
+      pageByPath.set(pathname, page);
+      urls.push(page.url);
+    } catch {
+      // skip invalid URLs
+    }
+  }
+
+  // Build the base tree from URLs
+  const sitemap = buildSitemapFromUrls(urls, projectUrl);
+
+  // Walk the tree and enrich nodes with scraped page data
+  function enrichNode(node: SitemapNode) {
+    const page = pageByPath.get(node.path);
+    if (page) {
+      node.hasContent = true;
+      node.url = page.url;
+      node.metadata = {
+        ...node.metadata,
+        title: page.title || undefined,
+      };
+    }
+    for (const child of node.children) {
+      enrichNode(child);
+    }
+  }
+  enrichNode(sitemap.rootNode);
+
+  return sitemap;
 }

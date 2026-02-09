@@ -46,11 +46,23 @@ export async function GET(
       .from(schema.competitors)
       .where(eq(schema.competitors.projectId, id));
 
+    const mockups = await db
+      .select()
+      .from(schema.mockups)
+      .where(eq(schema.mockups.projectId, id));
+
+    const savedPrompts = await db
+      .select()
+      .from(schema.savedPrompts)
+      .where(eq(schema.savedPrompts.projectId, id));
+
     return NextResponse.json({
       project: project[0],
       pages,
       analyses,
       competitors,
+      mockups,
+      savedPrompts,
     });
   } catch (error) {
     console.error("Error fetching project:", error);

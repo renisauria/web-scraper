@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
 import { Globe, FolderKanban } from "lucide-react";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -41,6 +42,7 @@ export default function RootLayout({
           </nav>
           <main className="container mx-auto px-4 py-8">{children}</main>
         </div>
+        <Toaster richColors position="bottom-right" />
       </body>
     </html>
   );
