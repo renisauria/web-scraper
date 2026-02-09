@@ -56,6 +56,11 @@ export async function GET(
       .from(schema.savedPrompts)
       .where(eq(schema.savedPrompts.projectId, id));
 
+    const designKits = await db
+      .select()
+      .from(schema.designKits)
+      .where(eq(schema.designKits.projectId, id));
+
     return NextResponse.json({
       project: project[0],
       pages,
@@ -63,6 +68,7 @@ export async function GET(
       competitors,
       mockups,
       savedPrompts,
+      designKit: designKits[0] || null,
     });
   } catch (error) {
     console.error("Error fetching project:", error);

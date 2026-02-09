@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { generateMockupPrompt } from "@/lib/openai";
+import { parseDesignTokens, formatTokensForPrompt } from "@/lib/design-tokens";
 import type { Project, Analysis, Competitor } from "@/types";
 
 const generatePromptSchema = z.object({
@@ -49,11 +50,30 @@ export async function POST(request: NextRequest) {
         eq(schema.competitors.projectId, projectId)
       )) as unknown as Competitor[];
 
+    // Fetch design kit for the project and format tokens for prompt
+    let designTokensContext: string | undefined;
+    const designKits = await db
+      .select()
+      .from(schema.designKits)
+      .where(eq(schema.designKits.projectId, projectId));
+
+    if (designKits.length > 0 && designKits[0].tokens) {
+      let tokens = designKits[0].tokens as Record<string, unknown>;
+      if (typeof tokens === "string") {
+        try { tokens = JSON.parse(tokens); } catch { tokens = {}; }
+      }
+      const flat = parseDesignTokens(tokens);
+      if (flat.length > 0) {
+        designTokensContext = formatTokensForPrompt(flat);
+      }
+    }
+
     // Generate the prompt via GPT-4
     const result = await generateMockupPrompt(project, analyses, competitors, {
       style,
       pageType,
       customInstructions: customInstructions || undefined,
+      designTokensContext,
     });
 
     return NextResponse.json({ prompt: result.prompt });

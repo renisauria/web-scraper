@@ -47,9 +47,11 @@ import {
   BookmarkPlus,
   BookMarked,
   ChevronDown,
+  Palette,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Project, Page, Analysis, Competitor, CompetitorType, Mockup, SavedPrompt } from "@/types";
+import type { Project, Page, Analysis, Competitor, CompetitorType, Mockup, SavedPrompt, DesignKit, FlatToken } from "@/types";
+import { parseDesignTokens } from "@/lib/design-tokens";
 import { AnalysisModal } from "@/components/analysis-modal";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { MarkdownViewer } from "@/components/ui/markdown-viewer";
@@ -61,6 +63,7 @@ interface ProjectData {
   competitors: Competitor[];
   mockups: Mockup[];
   savedPrompts: SavedPrompt[];
+  designKit: DesignKit | null;
 }
 
 export default function ProjectDetailPage({
@@ -111,6 +114,10 @@ export default function ProjectDetailPage({
   const [showLoadPrompt, setShowLoadPrompt] = useState(false);
   const [renamingPromptId, setRenamingPromptId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [uploadingDesignKit, setUploadingDesignKit] = useState(false);
+  const [designKitTab, setDesignKitTab] = useState<"colors" | "typography" | "spacing" | "other">("colors");
+  const [editingTokenPath, setEditingTokenPath] = useState<string | null>(null);
+  const [editingTokenValue, setEditingTokenValue] = useState("");
 
   const fetchProject = useCallback(async () => {
     try {
@@ -666,7 +673,7 @@ export default function ProjectDetailPage({
     );
   }
 
-  const { project, pages, analyses, competitors, mockups, savedPrompts } = data;
+  const { project, pages, analyses, competitors, mockups, savedPrompts, designKit } = data;
 
   // Sort pages: homepage first, then by URL depth and alphabetically
   const sortedPages = [...pages].sort((a, b) => {
@@ -1727,6 +1734,290 @@ export default function ProjectDetailPage({
               Add competitor or inspiration sites to capture screenshots for reference
             </button>
           ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Design Kit */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="h-5 w-5" />
+                Design Kit
+              </CardTitle>
+              <CardDescription>
+                Import Figma design tokens (.tokens.json) so mockups use your exact brand colors, fonts, and spacing
+              </CardDescription>
+            </div>
+            {designKit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive hover:text-destructive"
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`/api/design-kits/${designKit.id}`, { method: "DELETE" });
+                    if (!res.ok) throw new Error("Failed to delete design kit");
+                    await fetchProject();
+                    toast.success("Design kit removed");
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Failed to delete");
+                  }
+                }}
+                title="Remove design kit"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {designKit && designKit.tokens ? (() => {
+            let tokens = designKit.tokens as Record<string, unknown>;
+            if (typeof tokens === "string") {
+              try { tokens = JSON.parse(tokens); } catch { tokens = {}; }
+            }
+            const flatTokens = parseDesignTokens(tokens);
+            const colorTokens = flatTokens.filter(t => t.type === "color");
+            const typographyTokens = flatTokens.filter(t => ["typography", "fontFamily", "fontWeight", "fontSize", "lineHeight", "letterSpacing"].includes(t.type));
+            const spacingTokens = flatTokens.filter(t => ["dimension", "spacing", "sizing", "borderRadius", "borderWidth"].includes(t.type));
+            const otherTokens = flatTokens.filter(t => !["color", "typography", "fontFamily", "fontWeight", "fontSize", "lineHeight", "letterSpacing", "dimension", "spacing", "sizing", "borderRadius", "borderWidth"].includes(t.type));
+
+            const tabCounts = {
+              colors: colorTokens.length,
+              typography: typographyTokens.length,
+              spacing: spacingTokens.length,
+              other: otherTokens.length,
+            };
+
+            const currentTokens =
+              designKitTab === "colors" ? colorTokens :
+              designKitTab === "typography" ? typographyTokens :
+              designKitTab === "spacing" ? spacingTokens :
+              otherTokens;
+
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">{designKit.fileName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {flatTokens.length} tokens ({colorTokens.length} colors, {typographyTokens.length} typography, {spacingTokens.length} spacing)
+                    </p>
+                  </div>
+                  <label className="cursor-pointer">
+                    <Button variant="outline" size="sm" asChild>
+                      <span>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Replace
+                      </span>
+                    </Button>
+                    <input
+                      type="file"
+                      accept=".json,.tokens.json"
+                      className="hidden"
+                      disabled={uploadingDesignKit}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingDesignKit(true);
+                        try {
+                          const text = await file.text();
+                          const res = await fetch("/api/design-kits", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              projectId: id,
+                              fileName: file.name,
+                              tokensJson: text,
+                            }),
+                          });
+                          const result = await res.json();
+                          if (!res.ok) throw new Error(result.error || "Upload failed");
+                          await fetchProject();
+                          toast.success("Design kit replaced");
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Upload failed");
+                        } finally {
+                          setUploadingDesignKit(false);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex gap-1 border-b">
+                  {(["colors", "typography", "spacing", "other"] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => { setDesignKitTab(tab); setEditingTokenPath(null); }}
+                      className={`px-3 py-1.5 text-sm font-medium border-b-2 transition-colors ${
+                        designKitTab === tab
+                          ? "border-primary text-foreground"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      {tabCounts[tab] > 0 && (
+                        <span className="ml-1.5 text-xs text-muted-foreground">({tabCounts[tab]})</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Token list */}
+                {currentTokens.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No {designKitTab} tokens found</p>
+                ) : (
+                  <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                    {currentTokens.map(token => (
+                      <div key={token.path} className="flex items-center justify-between gap-3 py-1.5 px-2 rounded hover:bg-muted/50 group">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          {token.type === "color" && typeof token.rawValue === "string" && (
+                            <div
+                              className="h-6 w-6 rounded border flex-shrink-0"
+                              style={{ backgroundColor: token.rawValue }}
+                              title={token.rawValue}
+                            />
+                          )}
+                          <span className="text-sm font-mono text-muted-foreground truncate" title={token.path}>
+                            {token.path}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {editingTokenPath === token.path ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                value={editingTokenValue}
+                                onChange={e => setEditingTokenValue(e.target.value)}
+                                className="h-7 w-32 text-xs"
+                                onKeyDown={async e => {
+                                  if (e.key === "Enter") {
+                                    try {
+                                      const res = await fetch(`/api/design-kits/${designKit.id}`, {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ path: token.path, value: editingTokenValue }),
+                                      });
+                                      if (!res.ok) throw new Error("Failed to save");
+                                      await fetchProject();
+                                      setEditingTokenPath(null);
+                                      toast.success("Token updated");
+                                    } catch (err) {
+                                      toast.error(err instanceof Error ? err.message : "Failed to save");
+                                    }
+                                  } else if (e.key === "Escape") {
+                                    setEditingTokenPath(null);
+                                  }
+                                }}
+                                autoFocus
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/design-kits/${designKit.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ path: token.path, value: editingTokenValue }),
+                                    });
+                                    if (!res.ok) throw new Error("Failed to save");
+                                    await fetchProject();
+                                    setEditingTokenPath(null);
+                                    toast.success("Token updated");
+                                  } catch (err) {
+                                    toast.error(err instanceof Error ? err.message : "Failed to save");
+                                  }
+                                }}
+                              >
+                                <Save className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => setEditingTokenPath(null)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <span className="text-sm font-mono">{token.displayValue}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => {
+                                  setEditingTokenPath(token.path);
+                                  setEditingTokenValue(token.displayValue);
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })() : (
+            <label className="cursor-pointer block">
+              <div className="w-full p-6 rounded-lg border border-dashed text-center hover:border-foreground/20 transition-colors space-y-2">
+                {uploadingDesignKit ? (
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                ) : (
+                  <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
+                )}
+                <p className="text-sm text-muted-foreground">
+                  {uploadingDesignKit ? "Uploading..." : "Drop a .tokens.json file or click to upload"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Export from Figma using the &quot;Design Tokens (W3C)&quot; plugin
+                </p>
+              </div>
+              <input
+                type="file"
+                accept=".json,.tokens.json"
+                className="hidden"
+                disabled={uploadingDesignKit}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadingDesignKit(true);
+                  try {
+                    const text = await file.text();
+                    const res = await fetch("/api/design-kits", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        projectId: id,
+                        fileName: file.name,
+                        tokensJson: text,
+                      }),
+                    });
+                    const result = await res.json();
+                    if (!res.ok) throw new Error(result.error || "Upload failed");
+                    await fetchProject();
+                    toast.success("Design kit uploaded");
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Upload failed");
+                  } finally {
+                    setUploadingDesignKit(false);
+                    e.target.value = "";
+                  }
+                }}
+              />
+            </label>
+          )}
         </CardContent>
       </Card>
 

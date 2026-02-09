@@ -271,3 +271,19 @@ export interface SavedPrompt {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface DesignKit {
+  id: string;
+  projectId: string;
+  fileName: string;
+  tokens: Record<string, unknown> | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface FlatToken {
+  path: string;
+  type: string;
+  displayValue: string;
+  rawValue: unknown;
+}

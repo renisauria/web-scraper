@@ -15,7 +15,7 @@ export async function generateMockupPrompt(
   },
   analyses: { type: string; content: Record<string, unknown> | null }[],
   competitors: { name: string; url: string; notes?: string | null }[],
-  options: { style: string; pageType: string; customInstructions?: string }
+  options: { style: string; pageType: string; customInstructions?: string; designTokensContext?: string }
 ): Promise<{ prompt: string }> {
   const systemPrompt = `You are an elite prompt engineer specializing in crafting image-generation prompts for AI models like Google Gemini Imagen. Your job is to take project context and produce a single, hyper-detailed image prompt that will generate a stunning, realistic website mockup screenshot.
 
@@ -29,6 +29,7 @@ RULES FOR THE PROMPT YOU WRITE:
 7. INCLUDE NEGATIVE GUIDANCE — "Not a wireframe. Not a low-fidelity sketch. No lorem ipsum placeholder text — use realistic English copy. No watermarks. No UI kit component sheets."
 8. ANCHOR QUALITY — "Awwwards-quality design. Behance featured project level. Pixel-perfect rendering."
 9. INCLUDE REALISTIC CONTENT — suggest actual headline text, button labels, and section copy that match the brand.
+10. USE PROVIDED DESIGN TOKENS — if design tokens are provided, use the exact hex codes, font names, and spacing values from those tokens. Do not invent new colors or fonts when tokens are available.
 
 Return ONLY the complete image-generation prompt as plain text (no JSON wrapper, no markdown, no explanation). The prompt should be 400-800 words.`;
 
@@ -87,6 +88,10 @@ Return ONLY the complete image-generation prompt as plain text (no JSON wrapper,
     .slice(0, 3);
   if (competitorNotes.length > 0) {
     contextParts.push(`Competitor notes: ${competitorNotes.join("; ")}`);
+  }
+
+  if (options.designTokensContext) {
+    contextParts.push(`Design Tokens (use these exact values):\n${options.designTokensContext}`);
   }
 
   if (options.customInstructions) {

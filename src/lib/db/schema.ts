@@ -151,3 +151,21 @@ export const savedPrompts = sqliteTable("saved_prompts", {
 
 export type SavedPrompt = typeof savedPrompts.$inferSelect;
 export type NewSavedPrompt = typeof savedPrompts.$inferInsert;
+
+export const designKits = sqliteTable("design_kits", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  tokens: text("tokens", { mode: "json" }).$type<Record<string, unknown>>(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type DesignKit = typeof designKits.$inferSelect;
+export type NewDesignKit = typeof designKits.$inferInsert;

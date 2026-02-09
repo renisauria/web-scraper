@@ -221,7 +221,7 @@ export async function generateMockupPrompt(
   },
   analyses: { type: string; content: Record<string, unknown> | null }[],
   competitors: { name: string; url: string; notes?: string | null }[],
-  options: { style: string; pageType: string; customInstructions?: string }
+  options: { style: string; pageType: string; customInstructions?: string; designTokensContext?: string }
 ): Promise<{ prompt: string }> {
   const systemPrompt = `You are an elite prompt engineer specializing in crafting image-generation prompts for AI models like Google Gemini Imagen. Your job is to take project context and produce a single, hyper-detailed image prompt that will generate a stunning, realistic website mockup screenshot.
 
@@ -236,6 +236,7 @@ RULES FOR THE PROMPT YOU WRITE:
 8. ANCHOR QUALITY — "Awwwards-quality design. Behance featured project level. Pixel-perfect rendering."
 9. INCLUDE REALISTIC CONTENT — suggest actual headline text, button labels, and section copy that match the brand.
 10. USE ALL PROVIDED CONTEXT — you MUST incorporate the client's problems, competitor analysis, project requirements, client notes, and AI analysis insights into the visual design. For example, if the client wants better CTAs, describe specific CTA button designs. If analysis mentions poor navigation, describe an improved nav. If competitors are mentioned, reference their visual strengths. The prompt must reflect the SPECIFIC business, not a generic website.
+11. USE PROVIDED DESIGN TOKENS — if design tokens are provided, use the exact hex codes, font names, and spacing values from those tokens. Do not invent new colors or fonts when tokens are available.
 
 Return a JSON object with a single key "prompt" containing the complete image-generation prompt as a string. The prompt should be 400-800 words.`;
 
@@ -310,6 +311,10 @@ Return a JSON object with a single key "prompt" containing the complete image-ge
   });
   if (competitorDetails.length > 0) {
     contextParts.push(`Competitor/inspiration sites:\n${competitorDetails.join("\n")}`);
+  }
+
+  if (options.designTokensContext) {
+    contextParts.push(`Design Tokens (use these exact values):\n${options.designTokensContext}`);
   }
 
   if (options.customInstructions) {
