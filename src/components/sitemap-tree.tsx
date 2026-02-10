@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import {
   Home,
   ShoppingBag,
@@ -12,6 +14,10 @@ import {
   File,
   ChevronRight,
   ChevronDown,
+  Loader2,
+  ExternalLink,
+  RefreshCw,
+  ArrowUpRight,
 } from "lucide-react";
 import type { SitemapNode } from "@/types";
 
@@ -30,6 +36,12 @@ interface SitemapTreeProps {
   variant?: "current" | "recommended";
   depth?: number;
   defaultExpandDepth?: number;
+  onScrapeNode?: (node: SitemapNode) => void;
+  scrapingId?: string | null;
+  baseUrl?: string | null;
+  onRescrapeNode?: (node: SitemapNode) => void;
+  rescrapingId?: string | null;
+  projectId?: string;
 }
 
 function PriorityDot({ priority }: { priority: "high" | "medium" | "low" }) {
@@ -51,8 +63,15 @@ function SitemapTreeNode({
   variant = "current",
   depth = 0,
   defaultExpandDepth = 2,
+  onScrapeNode,
+  scrapingId,
+  baseUrl,
+  onRescrapeNode,
+  rescrapingId,
+  projectId,
 }: SitemapTreeProps) {
   const [expanded, setExpanded] = useState(depth < defaultExpandDepth);
+  const nodeUrl = node.url || (baseUrl ? baseUrl.replace(/\/$/, "") + node.path : null);
   const hasChildren = node.children && node.children.length > 0;
 
   const isNew = variant === "recommended" && node.metadata?.isNew;
@@ -86,11 +105,24 @@ function SitemapTreeNode({
         {/* Label and badges */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className={`text-sm font-medium ${isRemoved ? "line-through text-red-500" : ""}`}
-            >
-              {node.label}
-            </span>
+            {nodeUrl ? (
+              <a
+                href={nodeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`text-sm font-medium hover:underline inline-flex items-center gap-1 ${isRemoved ? "line-through text-red-500" : ""}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {node.label}
+                <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+              </a>
+            ) : (
+              <span
+                className={`text-sm font-medium ${isRemoved ? "line-through text-red-500" : ""}`}
+              >
+                {node.label}
+              </span>
+            )}
 
             {variant === "recommended" && node.metadata?.priority && (
               <PriorityDot priority={node.metadata.priority} />
@@ -103,9 +135,21 @@ function SitemapTreeNode({
             )}
 
             {node.hasContent && variant === "current" && (
-              <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
-                scraped
-              </Badge>
+              node.metadata?.pageId && projectId ? (
+                <Link
+                  href={`/projects/${projectId}/pages/${node.metadata.pageId}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Badge className="text-[10px] py-0 px-1.5 cursor-pointer bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 border-0 inline-flex items-center gap-0.5">
+                    already scraped
+                    <ArrowUpRight className="h-2.5 w-2.5" />
+                  </Badge>
+                </Link>
+              ) : (
+                <Badge className="text-[10px] py-0 px-1.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0">
+                  already scraped
+                </Badge>
+              )
             )}
 
             {isNew && (
@@ -124,6 +168,53 @@ function SitemapTreeNode({
               <Badge className="text-[10px] py-0 px-1.5 bg-orange-500 hover:bg-orange-600">
                 MOVED
               </Badge>
+            )}
+
+            {variant === "current" && !node.hasContent && onScrapeNode && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-5 text-[10px] px-1.5 py-0"
+                disabled={scrapingId === node.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onScrapeNode(node);
+                }}
+              >
+                {scrapingId === node.id ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Scraping...
+                  </>
+                ) : (
+                  "Scrape"
+                )}
+              </Button>
+            )}
+
+            {variant === "current" && node.hasContent && node.metadata?.pageId && onRescrapeNode && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-5 text-[10px] px-1.5 py-0"
+                disabled={rescrapingId === node.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRescrapeNode(node);
+                }}
+              >
+                {rescrapingId === node.id ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Scraping...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Scrape again
+                  </>
+                )}
+              </Button>
             )}
           </div>
 
@@ -156,6 +247,12 @@ function SitemapTreeNode({
               variant={variant}
               depth={depth + 1}
               defaultExpandDepth={defaultExpandDepth}
+              onScrapeNode={onScrapeNode}
+              scrapingId={scrapingId}
+              baseUrl={baseUrl}
+              onRescrapeNode={onRescrapeNode}
+              rescrapingId={rescrapingId}
+              projectId={projectId}
             />
           ))}
         </div>
@@ -168,10 +265,22 @@ export function SitemapTree({
   node,
   variant = "current",
   defaultExpandDepth = 2,
+  onScrapeNode,
+  scrapingId,
+  baseUrl,
+  onRescrapeNode,
+  rescrapingId,
+  projectId,
 }: {
   node: SitemapNode;
   variant?: "current" | "recommended";
   defaultExpandDepth?: number;
+  onScrapeNode?: (node: SitemapNode) => void;
+  scrapingId?: string | null;
+  baseUrl?: string | null;
+  onRescrapeNode?: (node: SitemapNode) => void;
+  rescrapingId?: string | null;
+  projectId?: string;
 }) {
   return (
     <div className="font-mono">
@@ -180,6 +289,12 @@ export function SitemapTree({
         variant={variant}
         depth={0}
         defaultExpandDepth={defaultExpandDepth}
+        onScrapeNode={onScrapeNode}
+        scrapingId={scrapingId}
+        baseUrl={baseUrl}
+        onRescrapeNode={onRescrapeNode}
+        rescrapingId={rescrapingId}
+        projectId={projectId}
       />
     </div>
   );

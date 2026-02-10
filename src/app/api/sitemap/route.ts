@@ -3,10 +3,11 @@ import { db, schema } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
-import { buildCurrentSitemap, buildSitemapFromUrls } from "@/lib/sitemap";
+import { buildCurrentSitemap, buildSitemapFromUrls, enrichSitemapWithPages } from "@/lib/sitemap";
 import { fetchAndParseSitemapXml } from "@/lib/sitemap-xml";
 import { generateRecommendedSitemap } from "@/lib/openai";
 import { logError } from "@/lib/error-logger";
+import type { SitemapData } from "@/types";
 
 const createSitemapSchema = z.object({
   projectId: z.string(),
@@ -33,6 +34,33 @@ export async function GET(request: NextRequest) {
       .select()
       .from(schema.sitemaps)
       .where(and(...conditions));
+
+    // Fetch scraped pages once and enrich current sitemaps so
+    // hasContent / pageId are always up-to-date with what's been scraped.
+    const project = await db
+      .select()
+      .from(schema.projects)
+      .where(eq(schema.projects.id, projectId))
+      .limit(1);
+
+    if (project.length > 0) {
+      const pages = await db
+        .select()
+        .from(schema.pages)
+        .where(eq(schema.pages.projectId, projectId));
+
+      if (pages.length > 0) {
+        for (const sitemap of sitemaps) {
+          if (sitemap.type === "current" && sitemap.data) {
+            enrichSitemapWithPages(
+              sitemap.data as unknown as SitemapData,
+              pages,
+              project[0].url
+            );
+          }
+        }
+      }
+    }
 
     return NextResponse.json({ sitemaps });
   } catch (error) {
@@ -72,6 +100,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: errorMsg }, { status: 400 });
       }
       sitemapData = buildSitemapFromUrls(result.urls, project[0].url);
+
+      // Enrich with any already-scraped pages
+      const scrapedPages = await db
+        .select()
+        .from(schema.pages)
+        .where(eq(schema.pages.projectId, projectId));
+      if (scrapedPages.length > 0) {
+        enrichSitemapWithPages(sitemapData, scrapedPages, project[0].url);
+      }
+
       importStats = {
         urlCount: result.urls.length,
         childSitemapsFound: result.childSitemapsFound,

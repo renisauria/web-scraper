@@ -224,6 +224,7 @@ export interface SitemapNode {
   children: SitemapNode[];
   metadata?: {
     title?: string;
+    pageId?: string;
     shopifyResourceType?: string;
     visualMockupId?: string;
     isNew?: boolean;

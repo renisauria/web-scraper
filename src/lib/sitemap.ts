@@ -112,33 +112,29 @@ export function buildSitemapFromUrls(
   };
 }
 
-export function buildCurrentSitemap(
+/**
+ * Enrich a sitemap tree with scraped page data (hasContent, pageId, title).
+ */
+export function enrichSitemapWithPages(
+  sitemap: SitemapData,
   pages: Page[],
   projectUrl: string
-): SitemapData {
+): void {
   const baseUrl = new URL(projectUrl);
   const baseHost = baseUrl.hostname;
 
-  // Build a map of path -> page for metadata lookup
   const pageByPath = new Map<string, Page>();
-  const urls: string[] = [];
-
   for (const page of pages) {
     try {
       const parsed = new URL(page.url);
       if (parsed.hostname !== baseHost) continue;
       const pathname = parsed.pathname.replace(/\/$/, "") || "/";
       pageByPath.set(pathname, page);
-      urls.push(page.url);
     } catch {
       // skip invalid URLs
     }
   }
 
-  // Build the base tree from URLs
-  const sitemap = buildSitemapFromUrls(urls, projectUrl);
-
-  // Walk the tree and enrich nodes with scraped page data
   function enrichNode(node: SitemapNode) {
     const page = pageByPath.get(node.path);
     if (page) {
@@ -147,6 +143,7 @@ export function buildCurrentSitemap(
       node.metadata = {
         ...node.metadata,
         title: page.title || undefined,
+        pageId: page.id,
       };
     }
     for (const child of node.children) {
@@ -154,6 +151,14 @@ export function buildCurrentSitemap(
     }
   }
   enrichNode(sitemap.rootNode);
+}
 
+export function buildCurrentSitemap(
+  pages: Page[],
+  projectUrl: string
+): SitemapData {
+  const urls = pages.map((p) => p.url);
+  const sitemap = buildSitemapFromUrls(urls, projectUrl);
+  enrichSitemapWithPages(sitemap, pages, projectUrl);
   return sitemap;
 }

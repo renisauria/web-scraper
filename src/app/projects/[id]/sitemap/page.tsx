@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { SitemapTree } from "@/components/sitemap-tree";
 import { toast } from "sonner";
-import type { SitemapData } from "@/types";
+import type { SitemapData, SitemapNode } from "@/types";
 
 type TabType = "current" | "recommended";
 
@@ -42,6 +42,9 @@ export default function SitemapPage({
   const [generating, setGenerating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scrapingNodeId, setScrapingNodeId] = useState<string | null>(null);
+  const [rescrapingNodeId, setRescrapingNodeId] = useState<string | null>(null);
+  const [projectUrl, setProjectUrl] = useState<string | null>(null);
 
   const fetchSitemaps = useCallback(async () => {
     try {
@@ -66,6 +69,21 @@ export default function SitemapPage({
   useEffect(() => {
     fetchSitemaps();
   }, [fetchSitemaps]);
+
+  useEffect(() => {
+    async function fetchProjectUrl() {
+      try {
+        const res = await fetch(`/api/projects/${id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setProjectUrl(data.project?.url || null);
+        }
+      } catch {
+        // non-critical, URL construction will fall back
+      }
+    }
+    fetchProjectUrl();
+  }, [id]);
 
   async function generateSitemap(type: TabType) {
     setError(null);
@@ -137,6 +155,73 @@ export default function SitemapPage({
       toast.error(msg);
     } finally {
       setImporting(false);
+    }
+  }
+
+  function markNodeScraped(node: SitemapNode, targetId: string, pageId?: string): SitemapNode {
+    if (node.id === targetId) {
+      return {
+        ...node,
+        hasContent: true,
+        metadata: { ...node.metadata, ...(pageId ? { pageId } : {}) },
+      };
+    }
+    return {
+      ...node,
+      children: node.children.map((c) => markNodeScraped(c, targetId, pageId)),
+    };
+  }
+
+  async function handleScrapeNode(node: SitemapNode) {
+    const fullUrl = node.url || (projectUrl ? projectUrl.replace(/\/$/, "") + node.path : null);
+    if (!fullUrl) {
+      toast.error("Cannot determine full URL for this page");
+      return;
+    }
+
+    setScrapingNodeId(node.id);
+    try {
+      const res = await fetch("/api/scrape/single", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: id, url: fullUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to scrape page");
+      }
+      toast.success(`Scraped "${node.label}" successfully`);
+      setCurrentSitemap((prev) =>
+        prev ? { ...prev, rootNode: markNodeScraped(prev.rootNode, node.id, data.page?.id) } : prev
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to scrape page";
+      toast.error(msg);
+    } finally {
+      setScrapingNodeId(null);
+    }
+  }
+
+  async function handleRescrapeNode(node: SitemapNode) {
+    const pageId = node.metadata?.pageId;
+    if (!pageId) {
+      toast.error("No page ID found — regenerate the sitemap to enable re-scraping");
+      return;
+    }
+
+    setRescrapingNodeId(node.id);
+    try {
+      const res = await fetch(`/api/pages/${pageId}`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to re-scrape page");
+      }
+      toast.success(`Re-scraped "${node.label}" — now at version ${data.newVersion}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to re-scrape page";
+      toast.error(msg);
+    } finally {
+      setRescrapingNodeId(null);
     }
   }
 
@@ -289,6 +374,12 @@ export default function SitemapPage({
                     node={activeSitemap.rootNode}
                     variant={activeTab}
                     defaultExpandDepth={3}
+                    onScrapeNode={activeTab === "current" ? handleScrapeNode : undefined}
+                    scrapingId={scrapingNodeId}
+                    baseUrl={projectUrl}
+                    onRescrapeNode={activeTab === "current" ? handleRescrapeNode : undefined}
+                    rescrapingId={rescrapingNodeId}
+                    projectId={id}
                   />
                 </div>
               ) : (
