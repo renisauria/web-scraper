@@ -36,10 +36,17 @@ export async function GET(
       .where(eq(schema.pageVersions.pageId, pageId))
       .orderBy(desc(schema.pageVersions.version));
 
+    // Get extracted products for this page
+    const products = await db
+      .select()
+      .from(schema.products)
+      .where(eq(schema.products.pageId, pageId));
+
     return NextResponse.json({
       page: page[0],
       project: project[0] || null,
       versions,
+      products,
     });
   } catch (error) {
     await logError({ route: "/api/pages/[pageId]", method: "GET", error });

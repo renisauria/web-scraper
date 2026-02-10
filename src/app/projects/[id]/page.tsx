@@ -2701,9 +2701,6 @@ export default function ProjectDetailPage({
                           className="rounded border-input"
                         />
                         <span className="truncate flex-1">{product.name}</span>
-                        {product.price && (
-                          <span className="text-xs text-muted-foreground shrink-0">{product.price}</span>
-                        )}
                       </label>
                     ))}
                   </div>
@@ -3271,7 +3268,19 @@ export default function ProjectDetailPage({
                       <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
                     </div>
                   </Link>
-                  <div className="px-3 pb-3">
+                  <div className="px-3 pb-3 space-y-2">
+                    {(() => {
+                      const pageProducts = products.filter(p => p.pageId === page.id);
+                      if (pageProducts.length === 0) return null;
+                      const latest = pageProducts.reduce((a, b) => new Date(a.updatedAt) > new Date(b.updatedAt) ? a : b);
+                      return (
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 rounded-md px-2 py-1.5">
+                          <Package className="h-3 w-3 shrink-0" />
+                          <span>{pageProducts.length} product{pageProducts.length !== 1 ? "s" : ""} extracted</span>
+                          <span className="text-emerald-500 ml-auto shrink-0">{new Date(latest.updatedAt).toLocaleDateString()}</span>
+                        </div>
+                      );
+                    })()}
                     <Button
                       variant="outline"
                       size="sm"
@@ -3284,7 +3293,7 @@ export default function ProjectDetailPage({
                       ) : (
                         <ShoppingBag className="h-3.5 w-3.5 mr-1.5" />
                       )}
-                      {extractingProducts === page.id ? "Extracting..." : "Extract Products"}
+                      {extractingProducts === page.id ? "Extracting..." : products.some(p => p.pageId === page.id) ? "Re-extract Products" : "Extract Products"}
                     </Button>
                   </div>
                 </div>

@@ -466,6 +466,7 @@ export async function generateMockupPrompt(
   project: {
     name: string;
     url: string;
+    clientName?: string | null;
     clientProblems?: string | null;
     competitorAnalysis?: string | null;
     projectRequirements?: string | null;
@@ -497,6 +498,9 @@ Return ONLY the complete image-generation prompt as plain text (no JSON wrapper,
   // Assemble all project context
   const contextParts: string[] = [];
   contextParts.push(`Website: "${project.name}" (${project.url})`);
+  if (project.clientName) {
+    contextParts.push(`Client: ${project.clientName}`);
+  }
   contextParts.push(`Design Style: ${options.style}`);
   contextParts.push(`Page Type: ${options.pageType}`);
 

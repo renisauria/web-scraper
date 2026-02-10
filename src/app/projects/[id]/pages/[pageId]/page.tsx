@@ -32,9 +32,15 @@ import {
   Camera,
   Maximize2,
   Trash2,
+  ShoppingBag,
+  Package,
+  DollarSign,
+  Tag,
+  Layers,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Page, PageVersion, Project } from "@/types";
+import type { Page, PageVersion, Project, Product } from "@/types";
 
 function formatVersionDate(date: Date | string): string {
   const d = new Date(date);
@@ -50,6 +56,7 @@ interface PageData {
   page: Page;
   project: Project | null;
   versions: PageVersion[];
+  products: Product[];
 }
 
 export default function PageDetailView({
@@ -67,6 +74,7 @@ export default function PageDetailView({
   const [error, setError] = useState<string | null>(null);
   const [viewingScreenshot, setViewingScreenshot] = useState<{ url: string; title: string } | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<PageVersion | null>(null);
+  const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
 
   const fetchPage = useCallback(async () => {
     try {
@@ -203,7 +211,7 @@ export default function PageDetailView({
     );
   }
 
-  const { page, project, versions } = data;
+  const { page, project, versions, products } = data;
   const metadata = page.metadata as Record<string, unknown> | null;
   const hasVersionHistory = versions && versions.length > 0;
 
@@ -545,6 +553,184 @@ export default function PageDetailView({
                 {page.content}
               </pre>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Extracted Products */}
+      {products && products.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShoppingBag className="h-5 w-5" />
+              Extracted Products
+            </CardTitle>
+            <CardDescription>
+              {products.length} product{products.length !== 1 ? "s" : ""} extracted from this page
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {products.map((product) => (
+              <div key={product.id} className="rounded-lg border overflow-hidden">
+                <div className="p-4 space-y-3">
+                  {/* Header row */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-base">{product.name}</h3>
+                      {product.brand && (
+                        <p className="text-sm text-muted-foreground">{product.brand}</p>
+                      )}
+                    </div>
+                    {product.price && (
+                      <div className="flex items-center gap-1 shrink-0 text-lg font-bold">
+                        <DollarSign className="h-4 w-4" />
+                        {product.price.replace(/^\$/, "")}
+                        {product.currency && product.currency !== "USD" && (
+                          <span className="text-xs font-normal text-muted-foreground ml-1">{product.currency}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  {product.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">{product.description}</p>
+                  )}
+
+                  {/* Tags row */}
+                  <div className="flex flex-wrap gap-2">
+                    {product.category && (
+                      <Badge variant="secondary" className="text-xs">
+                        <Tag className="h-3 w-3 mr-1" />
+                        {product.category}
+                      </Badge>
+                    )}
+                    {product.sku && (
+                      <Badge variant="outline" className="text-xs font-mono">
+                        SKU: {product.sku}
+                      </Badge>
+                    )}
+                    {product.availability && (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${
+                          product.availability.toLowerCase().includes("in stock")
+                            ? "border-emerald-300 text-emerald-700 bg-emerald-50"
+                            : product.availability.toLowerCase().includes("out")
+                            ? "border-red-300 text-red-700 bg-red-50"
+                            : ""
+                        }`}
+                      >
+                        {product.availability}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Variants */}
+                  {product.variants && product.variants.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          Variants
+                        </p>
+                      </div>
+                      <div className="space-y-2.5">
+                        {product.variants.map((variant, vi) => (
+                          <div key={vi} className="space-y-1.5">
+                            <p className="text-xs font-medium text-foreground">
+                              {variant.name}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {variant.options.map((option, oi) => (
+                                <Badge
+                                  key={oi}
+                                  variant="secondary"
+                                  className="font-normal cursor-default"
+                                >
+                                  {option}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Specifications */}
+                  {product.specifications && Object.keys(product.specifications).length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Specifications
+                      </p>
+                      <div className="rounded-md border border-border overflow-hidden divide-y divide-border">
+                        {Object.entries(product.specifications).map(([key, value], idx) => (
+                          <div
+                            key={key}
+                            className={`grid grid-cols-[minmax(100px,1fr)_2fr] gap-3 px-3 py-2 text-xs ${
+                              idx % 2 === 0 ? "bg-muted/30" : "bg-background"
+                            }`}
+                          >
+                            <dt className="font-medium text-foreground truncate">
+                              {key}
+                            </dt>
+                            <dd className="text-muted-foreground">
+                              {value}
+                            </dd>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Images */}
+                  {product.images && product.images.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+                        Images ({product.images.length})
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {product.images.map((img, i) => (
+                          <a key={i} href={img} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={img}
+                              alt={`${product.name} ${i + 1}`}
+                              className="h-16 w-16 rounded border object-cover hover:ring-2 hover:ring-primary transition-all"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Extracted date */}
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <p className="text-xs text-muted-foreground">
+                      Extracted {new Date(product.createdAt).toLocaleDateString()}
+                    </p>
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                      onClick={() => setExpandedProductId(expandedProductId === product.id ? null : product.id)}
+                    >
+                      <Code className="h-3 w-3" />
+                      {expandedProductId === product.id ? "Hide" : "View"} JSON
+                      <ChevronDown className={`h-3 w-3 transition-transform ${expandedProductId === product.id ? "rotate-180" : ""}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Collapsible raw JSON */}
+                {expandedProductId === product.id && (
+                  <div className="border-t bg-muted/30 p-4">
+                    <pre className="text-xs whitespace-pre-wrap font-mono overflow-auto max-h-[300px]">
+                      {JSON.stringify(product, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
