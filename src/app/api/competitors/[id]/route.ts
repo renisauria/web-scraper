@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { captureViewportScreenshot } from "@/lib/firecrawl";
+import { logError } from "@/lib/error-logger";
 
 const updateCompetitorSchema = z.object({
   name: z.string().min(1).optional(),
@@ -12,6 +13,7 @@ const updateCompetitorSchema = z.object({
   preferredFeatureUrl: z.string().url().optional().or(z.literal("")),
   notes: z.string().optional(),
   referenceImages: z.array(z.string()).optional(),
+  screenshotLabel: z.enum(["good", "bad"]).nullable().optional(),
 });
 
 export async function PATCH(
@@ -45,6 +47,7 @@ export async function PATCH(
     if (data.preferredFeatureUrl !== undefined) updates.preferredFeatureUrl = data.preferredFeatureUrl || null;
     if (data.notes !== undefined) updates.notes = data.notes || null;
     if (data.referenceImages !== undefined) updates.referenceImages = data.referenceImages;
+    if (data.screenshotLabel !== undefined) updates.screenshotLabel = data.screenshotLabel;
 
     if (Object.keys(updates).length > 0) {
       await db
@@ -61,13 +64,13 @@ export async function PATCH(
 
     return NextResponse.json({ competitor: updated[0] });
   } catch (error) {
-    console.error("Error updating competitor:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/competitors/[id]", method: "PATCH", error });
     return NextResponse.json(
       { error: "Failed to update competitor" },
       { status: 500 }
@@ -111,7 +114,7 @@ export async function POST(
 
     return NextResponse.json({ competitor: updated[0] });
   } catch (error) {
-    console.error("Error recapturing competitor screenshot:", error);
+    await logError({ route: "/api/competitors/[id]", method: "POST", error });
     return NextResponse.json(
       { error: "Failed to recapture screenshot" },
       { status: 500 }
@@ -145,7 +148,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting competitor:", error);
+    await logError({ route: "/api/competitors/[id]", method: "DELETE", error });
     return NextResponse.json(
       { error: "Failed to delete competitor" },
       { status: 500 }

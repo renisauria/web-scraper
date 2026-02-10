@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { logError } from "@/lib/error-logger";
 
 const updateProjectSchema = z.object({
   name: z.string().min(1).optional(),
@@ -61,6 +62,11 @@ export async function GET(
       .from(schema.designKits)
       .where(eq(schema.designKits.projectId, id));
 
+    const products = await db
+      .select()
+      .from(schema.products)
+      .where(eq(schema.products.projectId, id));
+
     return NextResponse.json({
       project: project[0],
       pages,
@@ -69,9 +75,10 @@ export async function GET(
       mockups,
       savedPrompts,
       designKit: designKits[0] || null,
+      products,
     });
   } catch (error) {
-    console.error("Error fetching project:", error);
+    await logError({ route: "/api/projects/[id]", method: "GET", error });
     return NextResponse.json(
       { error: "Failed to fetch project" },
       { status: 500 }
@@ -114,13 +121,13 @@ export async function PATCH(
 
     return NextResponse.json({ project: updated[0] });
   } catch (error) {
-    console.error("Error updating project:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/projects/[id]", method: "PATCH", error });
     return NextResponse.json(
       { error: "Failed to update project" },
       { status: 500 }
@@ -149,7 +156,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting project:", error);
+    await logError({ route: "/api/projects/[id]", method: "DELETE", error });
     return NextResponse.json(
       { error: "Failed to delete project" },
       { status: 500 }

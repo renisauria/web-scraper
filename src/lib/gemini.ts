@@ -115,14 +115,15 @@ async function resolveImageToBase64(
 
 export async function generateMockup(
   prompt: string,
-  referenceImages?: string[]
+  referenceImages?: string[],
+  negativeReferenceImages?: string[]
 ): Promise<{ image: string; text: string }> {
   const contents: Array<
     | { text: string }
     | { inlineData: { mimeType: string; data: string } }
   > = [];
 
-  // Add reference images if provided
+  // Add positive reference images
   if (referenceImages && referenceImages.length > 0) {
     const resolved = await Promise.all(
       referenceImages.slice(0, 5).map(resolveImageToBase64)
@@ -130,7 +131,23 @@ export async function generateMockup(
     const valid = resolved.filter(Boolean) as { mimeType: string; data: string }[];
     if (valid.length > 0) {
       contents.push({
-        text: "Here are reference images from competitor/inspiration sites. Use them as visual style references for the mockup:",
+        text: "POSITIVE reference images — emulate these design patterns for the mockup:",
+      });
+      for (const imgData of valid) {
+        contents.push({ inlineData: imgData });
+      }
+    }
+  }
+
+  // Add negative reference images
+  if (negativeReferenceImages && negativeReferenceImages.length > 0) {
+    const resolved = await Promise.all(
+      negativeReferenceImages.slice(0, 3).map(resolveImageToBase64)
+    );
+    const valid = resolved.filter(Boolean) as { mimeType: string; data: string }[];
+    if (valid.length > 0) {
+      contents.push({
+        text: "NEGATIVE examples — avoid these design patterns. Do NOT replicate these layouts or visual styles:",
       });
       for (const imgData of valid) {
         contents.push({ inlineData: imgData });

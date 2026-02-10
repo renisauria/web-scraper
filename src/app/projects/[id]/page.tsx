@@ -48,10 +48,18 @@ import {
   BookMarked,
   ChevronDown,
   Palette,
+  ShoppingBag,
+  Package,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Project, Page, Analysis, Competitor, CompetitorType, Mockup, SavedPrompt, DesignKit, FlatToken } from "@/types";
+import type { Project, Page, Analysis, Competitor, CompetitorType, ScreenshotLabel, Mockup, SavedPrompt, DesignKit, FlatToken, Product } from "@/types";
 import { parseDesignTokens } from "@/lib/design-tokens";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AnalysisModal } from "@/components/analysis-modal";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { MarkdownViewer } from "@/components/ui/markdown-viewer";
@@ -64,6 +72,7 @@ interface ProjectData {
   mockups: Mockup[];
   savedPrompts: SavedPrompt[];
   designKit: DesignKit | null;
+  products: Product[];
 }
 
 export default function ProjectDetailPage({
@@ -87,13 +96,13 @@ export default function ProjectDetailPage({
   const [contextForm, setContextForm] = useState({ clientProblems: "", competitorAnalysis: "", projectRequirements: "", clientNotes: "" });
   const [savingContext, setSavingContext] = useState(false);
   const [addingCompetitor, setAddingCompetitor] = useState(false);
-  const [competitorForm, setCompetitorForm] = useState({ name: "", url: "", type: "competitor" as CompetitorType, preferredFeature: "", preferredFeatureUrl: "", notes: "" });
+  const [competitorForm, setCompetitorForm] = useState({ name: "", url: "", type: "competitor" as CompetitorType, preferredFeature: "", preferredFeatureUrl: "", notes: "", screenshotLabel: null as ScreenshotLabel | null });
   const [savingCompetitor, setSavingCompetitor] = useState(false);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [capturingCompetitorId, setCapturingCompetitorId] = useState<string | null>(null);
   const [viewingCompetitor, setViewingCompetitor] = useState<Competitor | null>(null);
   const [editingCompetitor, setEditingCompetitor] = useState(false);
-  const [competitorEditForm, setCompetitorEditForm] = useState({ name: "", url: "", type: "competitor" as CompetitorType, preferredFeature: "", preferredFeatureUrl: "", notes: "" });
+  const [competitorEditForm, setCompetitorEditForm] = useState({ name: "", url: "", type: "competitor" as CompetitorType, preferredFeature: "", preferredFeatureUrl: "", notes: "", screenshotLabel: null as ScreenshotLabel | null });
   const [savingCompetitorEdit, setSavingCompetitorEdit] = useState(false);
   const [editReferenceImages, setEditReferenceImages] = useState<string[]>([]);
   const [viewingScreenshot, setViewingScreenshot] = useState<{ url: string; title: string } | null>(null);
@@ -114,10 +123,13 @@ export default function ProjectDetailPage({
   const [showLoadPrompt, setShowLoadPrompt] = useState(false);
   const [renamingPromptId, setRenamingPromptId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [viewingPromptLog, setViewingPromptLog] = useState<Mockup | null>(null);
   const [uploadingDesignKit, setUploadingDesignKit] = useState(false);
   const [designKitTab, setDesignKitTab] = useState<"colors" | "typography" | "spacing" | "other">("colors");
   const [editingTokenPath, setEditingTokenPath] = useState<string | null>(null);
   const [editingTokenValue, setEditingTokenValue] = useState("");
+  const [extractingProducts, setExtractingProducts] = useState<string | null>(null);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
   const fetchProject = useCallback(async () => {
     try {
@@ -321,6 +333,7 @@ export default function ProjectDetailPage({
           preferredFeature: competitorForm.preferredFeature.trim() || undefined,
           preferredFeatureUrl: competitorForm.preferredFeatureUrl.trim() || undefined,
           referenceImages: referenceImages.length ? referenceImages : undefined,
+          screenshotLabel: competitorForm.screenshotLabel,
           notes: competitorForm.notes.trim() || undefined,
         }),
       });
@@ -331,7 +344,7 @@ export default function ProjectDetailPage({
         throw new Error(result.error || "Failed to add competitor");
       }
 
-      setCompetitorForm({ name: "", url: "", type: "competitor", preferredFeature: "", preferredFeatureUrl: "", notes: "" });
+      setCompetitorForm({ name: "", url: "", type: "competitor", preferredFeature: "", preferredFeatureUrl: "", notes: "", screenshotLabel: null });
       setReferenceImages([]);
       setAddingCompetitor(false);
       await fetchProject();
@@ -405,6 +418,7 @@ export default function ProjectDetailPage({
       preferredFeature: viewingCompetitor.preferredFeature || "",
       preferredFeatureUrl: viewingCompetitor.preferredFeatureUrl || "",
       notes: viewingCompetitor.notes || "",
+      screenshotLabel: viewingCompetitor.screenshotLabel || null,
     });
     setEditReferenceImages(viewingCompetitor.referenceImages || []);
     setEditingCompetitor(true);
@@ -426,6 +440,7 @@ export default function ProjectDetailPage({
           preferredFeatureUrl: competitorEditForm.preferredFeatureUrl.trim(),
           notes: competitorEditForm.notes.trim(),
           referenceImages: editReferenceImages,
+          screenshotLabel: competitorEditForm.screenshotLabel,
         }),
       });
 
@@ -461,6 +476,7 @@ export default function ProjectDetailPage({
           style: mockupStyle,
           pageType: mockupPageType,
           customInstructions: mockupCustomPrompt.trim() || undefined,
+          selectedProductIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
         }),
       });
 
@@ -503,6 +519,9 @@ export default function ProjectDetailPage({
           label: mockupPageType,
           style: mockupStyle,
           extraReferenceImages: mockupRefImages.length > 0 ? mockupRefImages : undefined,
+          originalPrompt: generatedPrompt || undefined,
+          customInstructions: mockupCustomPrompt.trim() || undefined,
+          styleRef: mockupStyleRef.trim() || undefined,
         }),
       });
 
@@ -548,6 +567,63 @@ export default function ProjectDetailPage({
       setError(msg);
       toast.error(msg);
     }
+  }
+
+  async function handleExtractProducts(pageId: string) {
+    setExtractingProducts(pageId);
+    try {
+      const response = await fetch("/api/products/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to extract products");
+      }
+
+      if (result.extractedCount === 0) {
+        toast.info("No products found on this page");
+      } else {
+        toast.success(`Extracted ${result.extractedCount} product${result.extractedCount !== 1 ? "s" : ""}`);
+      }
+      await fetchProject();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to extract products";
+      toast.error(msg);
+    } finally {
+      setExtractingProducts(null);
+    }
+  }
+
+  async function handleDeleteProduct(productId: string) {
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Failed to delete product");
+      }
+
+      setSelectedProductIds((prev) => prev.filter((id) => id !== productId));
+      await fetchProject();
+      toast.success("Product deleted");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to delete product";
+      toast.error(msg);
+    }
+  }
+
+  function toggleProductSelection(productId: string) {
+    setSelectedProductIds((prev) =>
+      prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId]
+    );
   }
 
   async function handleSavePrompt() {
@@ -673,7 +749,7 @@ export default function ProjectDetailPage({
     );
   }
 
-  const { project, pages, analyses, competitors, mockups, savedPrompts, designKit } = data;
+  const { project, pages, analyses, competitors, mockups, savedPrompts, designKit, products } = data;
 
   // Sort pages: homepage first, then by URL depth and alphabetically
   const sortedPages = [...pages].sort((a, b) => {
@@ -800,6 +876,49 @@ export default function ProjectDetailPage({
                       </div>
                     </div>
                     <div className="space-y-2">
+                      <label className="text-sm font-medium">Screenshot Quality</label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input
+                            type="radio"
+                            name="editScreenshotLabel"
+                            value=""
+                            checked={competitorEditForm.screenshotLabel === null}
+                            onChange={() => setCompetitorEditForm({ ...competitorEditForm, screenshotLabel: null })}
+                            disabled={savingCompetitorEdit}
+                            className="accent-primary"
+                          />
+                          Unlabeled
+                        </label>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input
+                            type="radio"
+                            name="editScreenshotLabel"
+                            value="good"
+                            checked={competitorEditForm.screenshotLabel === "good"}
+                            onChange={() => setCompetitorEditForm({ ...competitorEditForm, screenshotLabel: "good" })}
+                            disabled={savingCompetitorEdit}
+                            className="accent-primary"
+                          />
+                          <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                          Good Inspiration
+                        </label>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input
+                            type="radio"
+                            name="editScreenshotLabel"
+                            value="bad"
+                            checked={competitorEditForm.screenshotLabel === "bad"}
+                            onChange={() => setCompetitorEditForm({ ...competitorEditForm, screenshotLabel: "bad" })}
+                            disabled={savingCompetitorEdit}
+                            className="accent-primary"
+                          />
+                          <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+                          Bad Example
+                        </label>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
                       <label className="text-sm font-medium">Preferred functionality</label>
                       <Input
                         placeholder="e.g. Interactive product configurator"
@@ -907,6 +1026,12 @@ export default function ProjectDetailPage({
                         <Badge variant={viewingCompetitor.type === "competitor" ? "secondary" : "outline"}>
                           {viewingCompetitor.type === "competitor" ? "Competitor" : "Inspiration"}
                         </Badge>
+                        {viewingCompetitor.screenshotLabel === "good" && (
+                          <Badge className="bg-green-100 text-green-700 border-green-300" variant="outline">Good Inspiration</Badge>
+                        )}
+                        {viewingCompetitor.screenshotLabel === "bad" && (
+                          <Badge className="bg-red-100 text-red-700 border-red-300" variant="outline">Bad Example</Badge>
+                        )}
                       </div>
                       <a
                         href={viewingCompetitor.url}
@@ -1569,6 +1694,49 @@ export default function ProjectDetailPage({
                 </div>
               </div>
               <div className="space-y-2">
+                <label className="text-sm font-medium">Screenshot Quality (optional)</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="screenshotLabel"
+                      value=""
+                      checked={competitorForm.screenshotLabel === null}
+                      onChange={() => setCompetitorForm({ ...competitorForm, screenshotLabel: null })}
+                      disabled={savingCompetitor}
+                      className="accent-primary"
+                    />
+                    Unlabeled
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="screenshotLabel"
+                      value="good"
+                      checked={competitorForm.screenshotLabel === "good"}
+                      onChange={() => setCompetitorForm({ ...competitorForm, screenshotLabel: "good" })}
+                      disabled={savingCompetitor}
+                      className="accent-primary"
+                    />
+                    <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                    Good Inspiration
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="screenshotLabel"
+                      value="bad"
+                      checked={competitorForm.screenshotLabel === "bad"}
+                      onChange={() => setCompetitorForm({ ...competitorForm, screenshotLabel: "bad" })}
+                      disabled={savingCompetitor}
+                      className="accent-primary"
+                    />
+                    <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+                    Bad Example
+                  </label>
+                </div>
+              </div>
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Preferred functionality (optional)</label>
                 <Input
                   placeholder="e.g. Interactive product configurator"
@@ -1675,7 +1843,7 @@ export default function ProjectDetailPage({
                   size="sm"
                   onClick={() => {
                     setAddingCompetitor(false);
-                    setCompetitorForm({ name: "", url: "", type: "competitor", preferredFeature: "", preferredFeatureUrl: "", notes: "" });
+                    setCompetitorForm({ name: "", url: "", type: "competitor", preferredFeature: "", preferredFeatureUrl: "", notes: "", screenshotLabel: null });
                     setReferenceImages([]);
                   }}
                   disabled={savingCompetitor}
@@ -1717,6 +1885,12 @@ export default function ProjectDetailPage({
                       <Badge variant={comp.type === "competitor" ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0">
                         {comp.type === "competitor" ? "Competitor" : "Inspiration"}
                       </Badge>
+                      {comp.screenshotLabel === "good" && (
+                        <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 border-green-300" variant="outline">Good</Badge>
+                      )}
+                      {comp.screenshotLabel === "bad" && (
+                        <Badge className="text-[10px] px-1.5 py-0 bg-red-100 text-red-700 border-red-300" variant="outline">Bad</Badge>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {comp.url}
@@ -2021,6 +2195,64 @@ export default function ProjectDetailPage({
         </CardContent>
       </Card>
 
+      {products.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Extracted Products
+            </CardTitle>
+            <CardDescription>
+              {products.length} product{products.length !== 1 ? "s" : ""} extracted from scraped pages
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {products.map((product) => (
+                <div
+                  key={product.id}
+                  className="group relative flex flex-col rounded-lg border overflow-hidden hover:border-primary/50 hover:shadow-md transition-all p-3 space-y-2"
+                >
+                  {product.images && product.images.length > 0 && (
+                    <div className="relative aspect-video bg-muted overflow-hidden rounded-md">
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        className="w-full h-full object-cover object-center"
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-medium text-sm truncate">{product.name}</p>
+                    {product.price && (
+                      <p className="text-sm text-muted-foreground">{product.price}</p>
+                    )}
+                    {product.variants && product.variants.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {product.variants.length} variant{product.variants.length !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                    {product.brand && (
+                      <p className="text-xs text-muted-foreground">{product.brand}</p>
+                    )}
+                  </div>
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-destructive"
+                      onClick={() => handleDeleteProduct(product.id)}
+                      title="Delete product"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -2092,6 +2324,36 @@ export default function ProjectDetailPage({
                   disabled={generatingPrompt}
                 />
               </div>
+              {products.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Include Products (optional)</label>
+                  <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-1">
+                    {products.map((product) => (
+                      <label
+                        key={product.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 cursor-pointer text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIds.includes(product.id)}
+                          onChange={() => toggleProductSelection(product.id)}
+                          disabled={generatingPrompt}
+                          className="rounded border-input"
+                        />
+                        <span className="truncate flex-1">{product.name}</span>
+                        {product.price && (
+                          <span className="text-xs text-muted-foreground shrink-0">{product.price}</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                  {selectedProductIds.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedProductIds.length} product{selectedProductIds.length !== 1 ? "s" : ""} selected — real data will be injected into the prompt
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button
                   onClick={handleGeneratePrompt}
@@ -2449,12 +2711,7 @@ export default function ProjectDetailPage({
                   <button
                     type="button"
                     className="text-left"
-                    onClick={() =>
-                      setViewingScreenshot({
-                        url: mockup.image,
-                        title: `${mockup.label || "Mockup"} — ${mockup.style || "Custom"}`,
-                      })
-                    }
+                    onClick={() => setViewingPromptLog(mockup)}
                   >
                     <div className="relative aspect-video bg-muted overflow-hidden">
                       <img
@@ -2482,17 +2739,30 @@ export default function ProjectDetailPage({
                       </p>
                     </div>
                   </button>
-                  <button
-                    type="button"
-                    className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteMockup(mockup.id);
-                    }}
-                    title="Delete mockup"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewingPromptLog(mockup);
+                      }}
+                      title="View prompt log"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteMockup(mockup.id);
+                      }}
+                      title="Delete mockup"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -2507,6 +2777,95 @@ export default function ProjectDetailPage({
         </CardContent>
       </Card>
 
+      {/* Prompt Log Dialog */}
+      <Dialog open={!!viewingPromptLog} onOpenChange={(open) => !open && setViewingPromptLog(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Prompt Log
+              {viewingPromptLog?.label && (
+                <Badge variant="secondary" className="text-xs">{viewingPromptLog.label}</Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {viewingPromptLog && (
+            <div className="space-y-4">
+              {/* Mockup image thumbnail */}
+              <div
+                className="relative group/mockthumb cursor-pointer rounded-lg overflow-hidden border"
+                onClick={() => {
+                  setViewingScreenshot({
+                    url: viewingPromptLog.image,
+                    title: `${viewingPromptLog.label || "Mockup"} — ${viewingPromptLog.style || "Custom"}`,
+                  });
+                }}
+              >
+                <img
+                  src={viewingPromptLog.image}
+                  alt={`Mockup: ${viewingPromptLog.label || "AI Generated"}`}
+                  className="w-full max-h-64 object-cover object-top"
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover/mockthumb:bg-black/40 transition-colors flex items-center justify-center">
+                  <span className="text-white text-sm font-medium opacity-0 group-hover/mockthumb:opacity-100 transition-opacity flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    View Full Image
+                  </span>
+                </div>
+              </div>
+
+              {viewingPromptLog.customInstructions && (
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Custom Instructions</h4>
+                  <pre className="text-xs bg-muted rounded-md p-3 whitespace-pre-wrap break-words">{viewingPromptLog.customInstructions}</pre>
+                </div>
+              )}
+              {viewingPromptLog.originalPrompt && (
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Original AI Prompt</h4>
+                  <pre className="text-xs bg-muted rounded-md p-3 whitespace-pre-wrap break-words max-h-60 overflow-y-auto">{viewingPromptLog.originalPrompt}</pre>
+                </div>
+              )}
+              <div>
+                <h4 className="text-sm font-medium mb-1">Final Prompt</h4>
+                <pre className="text-xs bg-muted rounded-md p-3 whitespace-pre-wrap break-words max-h-60 overflow-y-auto">{viewingPromptLog.prompt}</pre>
+              </div>
+              {viewingPromptLog.styleRef && (
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Style References</h4>
+                  <pre className="text-xs bg-muted rounded-md p-3 whitespace-pre-wrap break-words">{viewingPromptLog.styleRef}</pre>
+                </div>
+              )}
+              {!viewingPromptLog.originalPrompt && !viewingPromptLog.customInstructions && !viewingPromptLog.styleRef && (
+                <p className="text-sm text-muted-foreground italic">No detailed prompt history was recorded for this mockup.</p>
+              )}
+
+              {/* Refine Mockup button */}
+              <div className="pt-2 border-t">
+                <Button
+                  onClick={() => {
+                    const m = viewingPromptLog;
+                    if (m.style) setMockupStyle(m.style);
+                    if (m.label) setMockupPageType(m.label);
+                    if (m.customInstructions) setMockupCustomPrompt(m.customInstructions);
+                    setGeneratedPrompt(m.originalPrompt || m.prompt);
+                    setEditedPrompt(m.prompt);
+                    if (m.styleRef) setMockupStyleRef(m.styleRef);
+                    setShowMockupForm(false);
+                    setViewingPromptLog(null);
+                    toast.success("Mockup loaded — edit and regenerate");
+                  }}
+                  className="w-full"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refine Mockup
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {pages.length > 0 && (
         <Card>
           <CardHeader>
@@ -2519,39 +2878,56 @@ export default function ProjectDetailPage({
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {sortedPages.map((page) => (
-                <Link
+                <div
                   key={page.id}
-                  href={`/projects/${id}/pages/${page.id}`}
                   className="flex flex-col rounded-lg border overflow-hidden hover:border-primary/50 hover:shadow-md transition-all group"
                 >
-                  {page.screenshot ? (
-                    <div className="relative aspect-video bg-muted overflow-hidden">
-                      <img
-                        src={page.screenshot}
-                        alt={`Screenshot of ${page.title || page.url}`}
-                        className="w-full h-full object-cover object-top transition-transform group-hover:scale-105"
-                      />
-                    </div>
-                  ) : (
-                    <div className="aspect-video bg-muted flex items-center justify-center">
-                      <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
-                    </div>
-                  )}
-                  <div className="p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
-                      <div className="overflow-hidden">
-                        <p className="font-medium truncate text-sm group-hover:text-primary transition-colors">
-                          {page.title || "Untitled Page"}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {page.url}
-                        </p>
+                  <Link href={`/projects/${id}/pages/${page.id}`}>
+                    {page.screenshot ? (
+                      <div className="relative aspect-video bg-muted overflow-hidden">
+                        <img
+                          src={page.screenshot}
+                          alt={`Screenshot of ${page.title || page.url}`}
+                          className="w-full h-full object-cover object-top transition-transform group-hover:scale-105"
+                        />
                       </div>
+                    ) : (
+                      <div className="aspect-video bg-muted flex items-center justify-center">
+                        <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+                      </div>
+                    )}
+                    <div className="p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                        <div className="overflow-hidden">
+                          <p className="font-medium truncate text-sm group-hover:text-primary transition-colors">
+                            {page.title || "Untitled Page"}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {page.url}
+                          </p>
+                        </div>
+                      </div>
+                      <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
                     </div>
-                    <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </Link>
+                  <div className="px-3 pb-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      disabled={extractingProducts === page.id}
+                      onClick={() => handleExtractProducts(page.id)}
+                    >
+                      {extractingProducts === page.id ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <ShoppingBag className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      {extractingProducts === page.id ? "Extracting..." : "Extract Products"}
+                    </Button>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           </CardContent>

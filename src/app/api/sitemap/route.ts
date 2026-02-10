@@ -6,6 +6,7 @@ import { z } from "zod";
 import { buildCurrentSitemap, buildSitemapFromUrls } from "@/lib/sitemap";
 import { fetchAndParseSitemapXml } from "@/lib/sitemap-xml";
 import { generateRecommendedSitemap } from "@/lib/openai";
+import { logError } from "@/lib/error-logger";
 
 const createSitemapSchema = z.object({
   projectId: z.string(),
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ sitemaps });
   } catch (error) {
-    console.error("Error fetching sitemaps:", error);
+    await logError({ route: "/api/sitemap", method: "GET", error });
     return NextResponse.json(
       { error: "Failed to fetch sitemaps" },
       { status: 500 }
@@ -166,13 +167,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ sitemap: { ...sitemapRecord, data: sitemapData }, importStats }, { status: 201 });
   } catch (error) {
-    console.error("Error creating sitemap:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/sitemap", method: "POST", error });
     return NextResponse.json(
       { error: "Failed to generate sitemap" },
       { status: 500 }

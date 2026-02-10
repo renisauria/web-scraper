@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { logError } from "@/lib/error-logger";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -46,13 +47,13 @@ export async function PATCH(
 
     return NextResponse.json({ savedPrompt: updated[0] });
   } catch (error) {
-    console.error("Error updating saved prompt:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/saved-prompts/[id]", method: "PATCH", error });
     return NextResponse.json(
       { error: "Failed to update saved prompt" },
       { status: 500 }
@@ -84,7 +85,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting saved prompt:", error);
+    await logError({ route: "/api/saved-prompts/[id]", method: "DELETE", error });
     return NextResponse.json(
       { error: "Failed to delete saved prompt" },
       { status: 500 }

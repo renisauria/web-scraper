@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { generateMockupPrompt } from "@/lib/openai";
 import { parseDesignTokens, formatTokensForPrompt } from "@/lib/design-tokens";
-import type { Project, Analysis, Competitor } from "@/types";
+import { formatProductsForPrompt } from "@/lib/product-formatter";
+import { logError } from "@/lib/error-logger";
+import type { Project, Analysis, Competitor, Product } from "@/types";
 
 const generatePromptSchema = z.object({
   projectId: z.string().min(1),
   style: z.string().min(1),
   pageType: z.string().min(1),
   customInstructions: z.string().optional(),
+  selectedProductIds: z.array(z.string()).optional(),
 });
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, style, pageType, customInstructions } =
+    const { projectId, style, pageType, customInstructions, selectedProductIds } =
       generatePromptSchema.parse(body);
 
     // Fetch project
@@ -68,23 +71,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Fetch selected products and format for prompt
+    let productContext: string | undefined;
+    if (selectedProductIds && selectedProductIds.length > 0) {
+      const selectedProducts = await db
+        .select()
+        .from(schema.products)
+        .where(inArray(schema.products.id, selectedProductIds));
+
+      if (selectedProducts.length > 0) {
+        productContext = formatProductsForPrompt(selectedProducts as unknown as Product[]);
+      }
+    }
+
     // Generate the prompt via GPT-4
     const result = await generateMockupPrompt(project, analyses, competitors, {
       style,
       pageType,
       customInstructions: customInstructions || undefined,
       designTokensContext,
+      productContext,
     });
 
     return NextResponse.json({ prompt: result.prompt });
   } catch (error) {
-    console.error("Error generating mockup prompt:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/mockups/generate-prompt", method: "POST", error });
     return NextResponse.json(
       {
         error:

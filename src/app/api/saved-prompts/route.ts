@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
+import { logError } from "@/lib/error-logger";
 
 const createSchema = z.object({
   projectId: z.string().min(1),
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ savedPrompts: prompts });
   } catch (error) {
-    console.error("Error fetching saved prompts:", error);
+    await logError({ route: "/api/saved-prompts", method: "GET", error });
     return NextResponse.json(
       { error: "Failed to fetch saved prompts" },
       { status: 500 }
@@ -74,13 +75,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ savedPrompt: saved[0] });
   } catch (error) {
-    console.error("Error saving prompt:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/saved-prompts", method: "POST", error });
     return NextResponse.json(
       { error: "Failed to save prompt" },
       { status: 500 }

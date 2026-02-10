@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { updateTokenValue } from "@/lib/design-tokens";
+import { logError } from "@/lib/error-logger";
 
 const patchSchema = z.object({
   path: z.string().min(1, "Token path is required"),
@@ -61,13 +62,13 @@ export async function PATCH(
 
     return NextResponse.json({ designKit: updated[0] });
   } catch (error) {
-    console.error("Error updating design kit:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/design-kits/[id]", method: "PATCH", error });
     return NextResponse.json(
       { error: "Failed to update design kit" },
       { status: 500 }
@@ -99,7 +100,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting design kit:", error);
+    await logError({ route: "/api/design-kits/[id]", method: "DELETE", error });
     return NextResponse.json(
       { error: "Failed to delete design kit" },
       { status: 500 }

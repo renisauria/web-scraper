@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { logError } from "@/lib/error-logger";
 
 export async function GET(
   request: NextRequest,
@@ -47,7 +48,7 @@ export async function GET(
       project: project[0] || null,
     });
   } catch (error) {
-    console.error("Error fetching version:", error);
+    await logError({ route: "/api/pages/[pageId]/versions/[versionId]", method: "GET", error });
     return NextResponse.json(
       { error: "Failed to fetch version" },
       { status: 500 }
@@ -88,7 +89,7 @@ export async function DELETE(
       message: "Version deleted",
     });
   } catch (error) {
-    console.error("Error deleting version:", error);
+    await logError({ route: "/api/pages/[pageId]/versions/[versionId]", method: "DELETE", error });
     return NextResponse.json(
       { error: "Failed to delete version" },
       { status: 500 }

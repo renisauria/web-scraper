@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { captureFullPageScreenshot } from "@/lib/firecrawl";
+import { logError } from "@/lib/error-logger";
 
 // Capture a full-page screenshot for the page
 export async function POST(
@@ -47,7 +48,7 @@ export async function POST(
       fullPageScreenshot: screenshot,
     });
   } catch (error) {
-    console.error("Error capturing full-page screenshot:", error);
+    await logError({ route: "/api/pages/[pageId]/screenshot", method: "POST", error });
     return NextResponse.json(
       { error: "Failed to capture full-page screenshot" },
       { status: 500 }

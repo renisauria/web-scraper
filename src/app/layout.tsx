@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
-import { Globe, FolderKanban } from "lucide-react";
+import { Globe, FolderKanban, AlertCircle } from "lucide-react";
 import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -35,6 +35,13 @@ export default function RootLayout({
                   >
                     <FolderKanban className="h-4 w-4" />
                     Projects
+                  </Link>
+                  <Link
+                    href="/error-logs"
+                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <AlertCircle className="h-4 w-4" />
+                    Error Logs
                   </Link>
                 </div>
               </div>

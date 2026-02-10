@@ -220,8 +220,8 @@ export async function generateMockupPrompt(
     clientNotes?: string | null;
   },
   analyses: { type: string; content: Record<string, unknown> | null }[],
-  competitors: { name: string; url: string; notes?: string | null }[],
-  options: { style: string; pageType: string; customInstructions?: string; designTokensContext?: string }
+  competitors: { name: string; url: string; type?: string; preferredFeature?: string | null; notes?: string | null; screenshotLabel?: string | null }[],
+  options: { style: string; pageType: string; customInstructions?: string; designTokensContext?: string; productContext?: string }
 ): Promise<{ prompt: string }> {
   const systemPrompt = `You are an elite prompt engineer specializing in crafting image-generation prompts for AI models like Google Gemini Imagen. Your job is to take project context and produce a single, hyper-detailed image prompt that will generate a stunning, realistic website mockup screenshot.
 
@@ -235,8 +235,9 @@ RULES FOR THE PROMPT YOU WRITE:
 7. INCLUDE NEGATIVE GUIDANCE — "Not a wireframe. Not a low-fidelity sketch. No lorem ipsum placeholder text — use realistic English copy. No watermarks. No UI kit component sheets."
 8. ANCHOR QUALITY — "Awwwards-quality design. Behance featured project level. Pixel-perfect rendering."
 9. INCLUDE REALISTIC CONTENT — suggest actual headline text, button labels, and section copy that match the brand.
-10. USE ALL PROVIDED CONTEXT — you MUST incorporate the client's problems, competitor analysis, project requirements, client notes, and AI analysis insights into the visual design. For example, if the client wants better CTAs, describe specific CTA button designs. If analysis mentions poor navigation, describe an improved nav. If competitors are mentioned, reference their visual strengths. The prompt must reflect the SPECIFIC business, not a generic website.
+10. USE ALL PROVIDED CONTEXT — you MUST incorporate the client's problems, competitor analysis, project requirements, client notes, and AI analysis insights into the visual design. For example, if the client wants better CTAs, describe specific CTA button designs. If analysis mentions poor navigation, describe an improved nav. If competitors are labeled as POSITIVE INSPIRATION, emulate their design patterns. If competitors are labeled as NEGATIVE EXAMPLES, explicitly avoid their design patterns. The prompt must reflect the SPECIFIC business, not a generic website.
 11. USE PROVIDED DESIGN TOKENS — if design tokens are provided, use the exact hex codes, font names, and spacing values from those tokens. Do not invent new colors or fonts when tokens are available.
+12. USE REAL PRODUCT DATA — if product data is provided, use exact product names, prices, descriptions, and variant info. Show real product cards with real names and prices, not placeholder text.
 
 Return a JSON object with a single key "prompt" containing the complete image-generation prompt as a string. The prompt should be 400-800 words.`;
 
@@ -301,20 +302,34 @@ Return a JSON object with a single key "prompt" containing the complete image-ge
     }
   }
 
-  // Add competitor context with preferred features
-  const competitorDetails = competitors.slice(0, 5).map((c) => {
+  // Add competitor context grouped by label
+  const goodComps = competitors.filter((c) => c.screenshotLabel === "good");
+  const badComps = competitors.filter((c) => c.screenshotLabel === "bad");
+  const unlabeledComps = competitors.filter((c) => !c.screenshotLabel);
+
+  const formatCompDetail = (c: typeof competitors[0]) => {
     const detail = [`${c.name} (${c.url})`];
-    const comp = c as Record<string, unknown>;
-    if (comp.preferredFeature) detail.push(`preferred feature: ${comp.preferredFeature}`);
-    if (comp.notes) detail.push(`notes: ${(comp.notes as string).slice(0, 150)}`);
+    if (c.preferredFeature) detail.push(`preferred feature: ${c.preferredFeature}`);
+    if (c.notes) detail.push(`notes: ${c.notes!.slice(0, 150)}`);
     return detail.join(" — ");
-  });
-  if (competitorDetails.length > 0) {
-    contextParts.push(`Competitor/inspiration sites:\n${competitorDetails.join("\n")}`);
+  };
+
+  if (goodComps.length > 0) {
+    contextParts.push(`POSITIVE INSPIRATION (emulate these design patterns):\n${goodComps.slice(0, 5).map(formatCompDetail).join("\n")}`);
+  }
+  if (badComps.length > 0) {
+    contextParts.push(`NEGATIVE EXAMPLES (avoid these design patterns):\n${badComps.slice(0, 5).map(formatCompDetail).join("\n")}`);
+  }
+  if (unlabeledComps.length > 0) {
+    contextParts.push(`Competitor/inspiration sites:\n${unlabeledComps.slice(0, 5).map(formatCompDetail).join("\n")}`);
   }
 
   if (options.designTokensContext) {
     contextParts.push(`Design Tokens (use these exact values):\n${options.designTokensContext}`);
+  }
+
+  if (options.productContext) {
+    contextParts.push(options.productContext);
   }
 
   if (options.customInstructions) {

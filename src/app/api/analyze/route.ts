@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { analyzeContent, analyzeAll, type AnalysisType } from "@/lib/openai";
 import { z } from "zod";
+import { logError } from "@/lib/error-logger";
 
 const analyzeSchema = z.object({
   projectId: z.string().uuid("Valid project ID is required"),
@@ -137,13 +138,13 @@ export async function POST(request: NextRequest) {
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
-    console.error("Error analyzing:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/analyze", method: "POST", error });
     return NextResponse.json(
       { error: "Failed to analyze content" },
       { status: 500 }

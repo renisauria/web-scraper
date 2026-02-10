@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { startAsyncCrawl } from "@/lib/firecrawl";
 import { z } from "zod";
+import { logError } from "@/lib/error-logger";
 
 const scrapeSchema = z.object({
   projectId: z.string().uuid("Valid project ID is required"),
@@ -60,13 +61,13 @@ export async function POST(request: NextRequest) {
       message: "Crawl started",
     });
   } catch (error) {
-    console.error("Error starting scrape:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/scrape", method: "POST", error });
     return NextResponse.json(
       { error: "Failed to start scraping" },
       { status: 500 }

@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { scrapeSinglePage } from "@/lib/firecrawl";
 import { z } from "zod";
+import { logError } from "@/lib/error-logger";
 
 const singleScrapeSchema = z.object({
   projectId: z.string().uuid("Valid project ID is required"),
@@ -81,13 +82,13 @@ export async function POST(request: NextRequest) {
       page: pageRecord,
     });
   } catch (error) {
-    console.error("Error scraping single URL:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/scrape/single", method: "POST", error });
     return NextResponse.json(
       { error: "Failed to scrape URL" },
       { status: 500 }

@@ -106,6 +106,7 @@ export const competitors = sqliteTable("competitors", {
   preferredFeatureUrl: text("preferred_feature_url"),
   screenshot: text("screenshot"),
   referenceImages: text("reference_image", { mode: "json" }).$type<string[]>(),
+  screenshotLabel: text("screenshot_label"),
   notes: text("notes"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
@@ -124,6 +125,9 @@ export const mockups = sqliteTable("mockups", {
   image: text("image").notNull(),
   label: text("label"),
   style: text("style"),
+  originalPrompt: text("original_prompt"),
+  customInstructions: text("custom_instructions"),
+  styleRef: text("style_ref"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -169,3 +173,54 @@ export const designKits = sqliteTable("design_kits", {
 
 export type DesignKit = typeof designKits.$inferSelect;
 export type NewDesignKit = typeof designKits.$inferInsert;
+
+export const errorLogs = sqliteTable("error_logs", {
+  id: text("id").primaryKey(),
+  route: text("route").notNull(),
+  method: text("method").notNull(),
+  message: text("message").notNull(),
+  stack: text("stack"),
+  context: text("context", { mode: "json" }).$type<Record<string, unknown>>(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type ErrorLog = typeof errorLogs.$inferSelect;
+export type NewErrorLog = typeof errorLogs.$inferInsert;
+
+export const products = sqliteTable("products", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  pageId: text("page_id")
+    .notNull()
+    .references(() => pages.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  price: text("price"),
+  currency: text("currency").default("USD"),
+  variants: text("variants", { mode: "json" }).$type<ProductVariant[]>(),
+  specifications: text("specifications", { mode: "json" }).$type<Record<string, string>>(),
+  images: text("images", { mode: "json" }).$type<string[]>(),
+  category: text("category"),
+  brand: text("brand"),
+  sku: text("sku"),
+  availability: text("availability"),
+  rawExtraction: text("raw_extraction", { mode: "json" }).$type<Record<string, unknown>>(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export interface ProductVariant {
+  name: string;
+  options: string[];
+}
+
+export type Product = typeof products.$inferSelect;
+export type NewProduct = typeof products.$inferInsert;

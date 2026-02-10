@@ -197,6 +197,7 @@ export interface RecommendationsAnalysis {
 }
 
 export type CompetitorType = "competitor" | "inspiration";
+export type ScreenshotLabel = "good" | "bad";
 
 export interface Competitor {
   id: string;
@@ -208,6 +209,7 @@ export interface Competitor {
   preferredFeatureUrl: string | null;
   screenshot: string | null;
   referenceImages: string[] | null;
+  screenshotLabel: ScreenshotLabel | null;
   notes: string | null;
   createdAt: Date;
 }
@@ -258,6 +260,9 @@ export interface Mockup {
   image: string;
   label: string | null;
   style: string | null;
+  originalPrompt: string | null;
+  customInstructions: string | null;
+  styleRef: string | null;
   createdAt: Date;
 }
 
@@ -286,4 +291,29 @@ export interface FlatToken {
   type: string;
   displayValue: string;
   rawValue: unknown;
+}
+
+export interface ProductVariant {
+  name: string;
+  options: string[];
+}
+
+export interface Product {
+  id: string;
+  projectId: string;
+  pageId: string;
+  name: string;
+  description: string | null;
+  price: string | null;
+  currency: string | null;
+  variants: ProductVariant[] | null;
+  specifications: Record<string, string> | null;
+  images: string[] | null;
+  category: string | null;
+  brand: string | null;
+  sku: string | null;
+  availability: string | null;
+  rawExtraction: Record<string, unknown> | null;
+  createdAt: Date;
+  updatedAt: Date;
 }

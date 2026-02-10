@@ -14,8 +14,8 @@ export async function generateMockupPrompt(
     clientNotes?: string | null;
   },
   analyses: { type: string; content: Record<string, unknown> | null }[],
-  competitors: { name: string; url: string; notes?: string | null }[],
-  options: { style: string; pageType: string; customInstructions?: string; designTokensContext?: string }
+  competitors: { name: string; url: string; type?: string; preferredFeature?: string | null; notes?: string | null; screenshotLabel?: string | null }[],
+  options: { style: string; pageType: string; customInstructions?: string; designTokensContext?: string; productContext?: string }
 ): Promise<{ prompt: string }> {
   const systemPrompt = `You are an elite prompt engineer specializing in crafting image-generation prompts for AI models like Google Gemini Imagen. Your job is to take project context and produce a single, hyper-detailed image prompt that will generate a stunning, realistic website mockup screenshot.
 
@@ -30,6 +30,8 @@ RULES FOR THE PROMPT YOU WRITE:
 8. ANCHOR QUALITY — "Awwwards-quality design. Behance featured project level. Pixel-perfect rendering."
 9. INCLUDE REALISTIC CONTENT — suggest actual headline text, button labels, and section copy that match the brand.
 10. USE PROVIDED DESIGN TOKENS — if design tokens are provided, use the exact hex codes, font names, and spacing values from those tokens. Do not invent new colors or fonts when tokens are available.
+11. USE REAL PRODUCT DATA — if product data is provided, use exact product names, prices, descriptions, and variant info. Show real product cards with real names and prices, not placeholder text.
+12. USE COMPETITOR GUIDANCE — if competitors are labeled as POSITIVE INSPIRATION, emulate their design patterns and visual strengths. If competitors are labeled as NEGATIVE EXAMPLES, explicitly avoid their design patterns and shortcomings.
 
 Return ONLY the complete image-generation prompt as plain text (no JSON wrapper, no markdown, no explanation). The prompt should be 400-800 words.`;
 
@@ -73,25 +75,34 @@ Return ONLY the complete image-generation prompt as plain text (no JSON wrapper,
     }
   }
 
-  // Add competitor context
-  const competitorNames = competitors
-    .map((c) => `${c.name} (${c.url})`)
-    .slice(0, 5);
-  if (competitorNames.length > 0) {
-    contextParts.push(
-      `Competitor/inspiration sites: ${competitorNames.join(", ")}`
-    );
+  // Add competitor context grouped by label
+  const goodComps = competitors.filter((c) => c.screenshotLabel === "good");
+  const badComps = competitors.filter((c) => c.screenshotLabel === "bad");
+  const unlabeledComps = competitors.filter((c) => !c.screenshotLabel);
+
+  const formatCompDetail = (c: typeof competitors[0]) => {
+    const detail = [`${c.name} (${c.url})`];
+    if (c.preferredFeature) detail.push(`preferred feature: ${c.preferredFeature}`);
+    if (c.notes) detail.push(`notes: ${c.notes!.slice(0, 150)}`);
+    return detail.join(" — ");
+  };
+
+  if (goodComps.length > 0) {
+    contextParts.push(`POSITIVE INSPIRATION (emulate these design patterns):\n${goodComps.slice(0, 5).map(formatCompDetail).join("\n")}`);
   }
-  const competitorNotes = competitors
-    .filter((c) => c.notes)
-    .map((c) => `${c.name}: ${c.notes!.slice(0, 150)}`)
-    .slice(0, 3);
-  if (competitorNotes.length > 0) {
-    contextParts.push(`Competitor notes: ${competitorNotes.join("; ")}`);
+  if (badComps.length > 0) {
+    contextParts.push(`NEGATIVE EXAMPLES (avoid these design patterns):\n${badComps.slice(0, 5).map(formatCompDetail).join("\n")}`);
+  }
+  if (unlabeledComps.length > 0) {
+    contextParts.push(`Competitor/inspiration sites:\n${unlabeledComps.slice(0, 5).map(formatCompDetail).join("\n")}`);
   }
 
   if (options.designTokensContext) {
     contextParts.push(`Design Tokens (use these exact values):\n${options.designTokensContext}`);
+  }
+
+  if (options.productContext) {
+    contextParts.push(options.productContext);
   }
 
   if (options.customInstructions) {

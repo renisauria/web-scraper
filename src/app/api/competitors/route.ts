@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import { captureViewportScreenshot } from "@/lib/firecrawl";
+import { logError } from "@/lib/error-logger";
 
 const createCompetitorSchema = z.object({
   projectId: z.string().uuid("Valid project ID is required"),
@@ -13,6 +14,7 @@ const createCompetitorSchema = z.object({
   preferredFeature: z.string().optional(),
   preferredFeatureUrl: z.string().url("Valid URL is required").optional().or(z.literal("")),
   referenceImages: z.array(z.string()).optional(),
+  screenshotLabel: z.enum(["good", "bad"]).nullable().optional(),
   notes: z.string().optional(),
 });
 
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ competitors });
   } catch (error) {
-    console.error("Error fetching competitors:", error);
+    await logError({ route: "/api/competitors", method: "GET", error });
     return NextResponse.json(
       { error: "Failed to fetch competitors" },
       { status: 500 }
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, name, url, type, preferredFeature, preferredFeatureUrl, referenceImages, notes } = createCompetitorSchema.parse(body);
+    const { projectId, name, url, type, preferredFeature, preferredFeatureUrl, referenceImages, screenshotLabel, notes } = createCompetitorSchema.parse(body);
 
     // Verify project exists
     const project = await db
@@ -74,6 +76,7 @@ export async function POST(request: NextRequest) {
       preferredFeatureUrl: preferredFeatureUrl || null,
       screenshot,
       referenceImages: referenceImages?.length ? referenceImages : null,
+      screenshotLabel: screenshotLabel || null,
       notes: notes || null,
     });
 
@@ -85,13 +88,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ competitor: created[0] }, { status: 201 });
   } catch (error) {
-    console.error("Error creating competitor:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/competitors", method: "POST", error });
     return NextResponse.json(
       { error: "Failed to create competitor" },
       { status: 500 }

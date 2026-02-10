@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { logError } from "@/lib/error-logger";
 
 export async function DELETE(
   request: NextRequest,
@@ -23,7 +24,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting mockup:", error);
+    await logError({ route: "/api/mockups/[id]", method: "DELETE", error });
     return NextResponse.json(
       { error: "Failed to delete mockup" },
       { status: 500 }

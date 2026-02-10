@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { getCrawlStatus } from "@/lib/firecrawl";
+import { logError } from "@/lib/error-logger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -126,7 +127,7 @@ export async function GET(request: NextRequest) {
       total: crawlStatus.total,
     });
   } catch (error) {
-    console.error("Error checking scrape status:", error);
+    await logError({ route: "/api/scrape/status", method: "GET", error });
     return NextResponse.json(
       { error: "Failed to check scrape status" },
       { status: 500 }

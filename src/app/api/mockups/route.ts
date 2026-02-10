@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import { generateMockup } from "@/lib/gemini";
+import { logError } from "@/lib/error-logger";
 import type { Competitor } from "@/types";
 
 export const maxDuration = 120;
@@ -14,12 +15,15 @@ const generateSchema = z.object({
   label: z.string().optional(),
   style: z.string().optional(),
   extraReferenceImages: z.array(z.string()).optional(),
+  originalPrompt: z.string().optional(),
+  customInstructions: z.string().optional(),
+  styleRef: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, prompt, label, style, extraReferenceImages } = generateSchema.parse(body);
+    const { projectId, prompt, label, style, extraReferenceImages, originalPrompt, customInstructions, styleRef } = generateSchema.parse(body);
 
     // Verify project exists
     const projectRows = await db
@@ -32,34 +36,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Collect reference images from competitors (screenshots + reference images)
+    // Collect reference images from competitors, grouped by label
     const competitors = (await db
       .select()
       .from(schema.competitors)
       .where(eq(schema.competitors.projectId, projectId))) as unknown as Competitor[];
 
-    const referenceImages: string[] = [];
+    const goodReferenceImages: string[] = [];
+    const badReferenceImages: string[] = [];
 
-    // Add user-uploaded visual references first (highest priority)
+    // Add user-uploaded visual references as positive (highest priority)
     if (extraReferenceImages) {
-      referenceImages.push(...extraReferenceImages);
+      goodReferenceImages.push(...extraReferenceImages);
     }
 
-    // Fill remaining slots with competitor images
+    // Group competitor images by label
     for (const comp of competitors) {
-      if (referenceImages.length >= 5) break;
-      if (comp.screenshot) {
-        referenceImages.push(comp.screenshot);
-      }
-      if (comp.referenceImages) {
-        referenceImages.push(...comp.referenceImages);
+      const images: string[] = [];
+      if (comp.screenshot) images.push(comp.screenshot);
+      if (comp.referenceImages) images.push(...comp.referenceImages);
+
+      if (comp.screenshotLabel === "bad") {
+        badReferenceImages.push(...images);
+      } else {
+        // good + unlabeled → positive references
+        goodReferenceImages.push(...images);
       }
     }
 
     // Generate mockup using the prompt directly
     const result = await generateMockup(
       prompt,
-      referenceImages.length > 0 ? referenceImages.slice(0, 5) : undefined
+      goodReferenceImages.length > 0 ? goodReferenceImages.slice(0, 5) : undefined,
+      badReferenceImages.length > 0 ? badReferenceImages.slice(0, 3) : undefined
     );
 
     // Save to DB
@@ -71,6 +80,9 @@ export async function POST(request: NextRequest) {
       image: result.image,
       label: label || null,
       style: style || null,
+      originalPrompt: originalPrompt || null,
+      customInstructions: customInstructions || null,
+      styleRef: styleRef || null,
     });
 
     // Fetch the saved mockup
@@ -82,15 +94,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ mockup: savedMockup[0] });
   } catch (error) {
-    console.error("Error generating mockup:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/mockups", method: "POST", error });
     const errorMessage = error instanceof Error ? error.message : "Failed to generate mockup";
-    console.error("Mockup error details:", errorMessage);
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

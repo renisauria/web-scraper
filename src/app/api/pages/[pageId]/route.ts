@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { scrapeSinglePage } from "@/lib/firecrawl";
+import { logError } from "@/lib/error-logger";
 
 export async function GET(
   request: NextRequest,
@@ -41,7 +42,7 @@ export async function GET(
       versions,
     });
   } catch (error) {
-    console.error("Error fetching page:", error);
+    await logError({ route: "/api/pages/[pageId]", method: "GET", error });
     return NextResponse.json(
       { error: "Failed to fetch page" },
       { status: 500 }
@@ -124,7 +125,7 @@ export async function POST(
       newVersion,
     });
   } catch (error) {
-    console.error("Error re-scraping page:", error);
+    await logError({ route: "/api/pages/[pageId]", method: "POST", error });
     return NextResponse.json(
       { error: "Failed to re-scrape page" },
       { status: 500 }

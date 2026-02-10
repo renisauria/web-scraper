@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { desc } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
+import { logError } from "@/lib/error-logger";
 
 const createProjectSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -21,7 +22,7 @@ export async function GET() {
 
     return NextResponse.json({ projects });
   } catch (error) {
-    console.error("Error fetching projects:", error);
+    await logError({ route: "/api/projects", method: "GET", error });
     return NextResponse.json(
       { error: "Failed to fetch projects" },
       { status: 500 }
@@ -50,13 +51,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ project }, { status: 201 });
   } catch (error) {
-    console.error("Error creating project:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/projects", method: "POST", error });
     return NextResponse.json(
       { error: "Failed to create project" },
       { status: 500 }

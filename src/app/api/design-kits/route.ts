@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import { parseDesignTokens } from "@/lib/design-tokens";
+import { logError } from "@/lib/error-logger";
 
 const createDesignKitSchema = z.object({
   projectId: z.string().min(1, "projectId is required"),
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ designKit: kits[0] || null });
   } catch (error) {
-    console.error("Error fetching design kits:", error);
+    await logError({ route: "/api/design-kits", method: "GET", error });
     return NextResponse.json(
       { error: "Failed to fetch design kits" },
       { status: 500 }
@@ -97,13 +98,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ designKit: created[0] }, { status: 201 });
   } catch (error) {
-    console.error("Error creating design kit:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
+    await logError({ route: "/api/design-kits", method: "POST", error });
     return NextResponse.json(
       { error: "Failed to create design kit" },
       { status: 500 }
