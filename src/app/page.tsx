@@ -19,6 +19,7 @@ import {
   Layout,
   Zap,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 import type { Project } from "@/types";
 
@@ -45,6 +46,15 @@ export default function Home() {
   const recentProjects = projects.slice(0, 3);
   const completedCount = projects.filter((p) => p.status === "complete").length;
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground animate-pulse">Loading your projects...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -69,7 +79,7 @@ export default function Home() {
             <Globe className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loading ? "-" : projects.length}</div>
+            <div className="text-2xl font-bold">{projects.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -78,7 +88,7 @@ export default function Home() {
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loading ? "-" : completedCount}</div>
+            <div className="text-2xl font-bold">{completedCount}</div>
           </CardContent>
         </Card>
         <Card>
@@ -88,7 +98,7 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? "-" : projects.filter((p) => ["scraping", "analyzing"].includes(p.status)).length}
+              {projects.filter((p) => ["scraping", "analyzing"].includes(p.status)).length}
             </div>
           </CardContent>
         </Card>
@@ -99,7 +109,7 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? "-" : projects.filter((p) => p.status === "scraped").length}
+              {projects.filter((p) => p.status === "scraped").length}
             </div>
           </CardContent>
         </Card>
@@ -112,9 +122,7 @@ export default function Home() {
             <CardDescription>Your latest website analysis projects</CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <p className="text-muted-foreground">Loading...</p>
-            ) : recentProjects.length === 0 ? (
+            {recentProjects.length === 0 ? (
               <div className="text-center py-6">
                 <p className="text-muted-foreground mb-4">No projects yet</p>
                 <Link href="/projects/new">
