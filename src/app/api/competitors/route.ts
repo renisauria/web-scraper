@@ -13,7 +13,10 @@ const createCompetitorSchema = z.object({
   type: z.enum(["competitor", "inspiration"]).default("competitor"),
   preferredFeature: z.string().optional(),
   preferredFeatureUrl: z.string().url("Valid URL is required").optional().or(z.literal("")),
-  referenceImages: z.array(z.string()).optional(),
+  referenceImages: z.array(z.object({
+    url: z.string(),
+    tag: z.enum(["emulate", "avoid"]).nullable(),
+  })).optional(),
   screenshotLabel: z.enum(["good", "bad"]).nullable().optional(),
   notes: z.string().optional(),
 });

@@ -58,20 +58,35 @@ export function buildMockupPrompt(
     }
   }
 
-  // Add competitor context
-  const competitorNames = competitors
-    .map((c) => `${c.name} (${c.url})`)
-    .slice(0, 5);
-  if (competitorNames.length > 0) {
-    parts.push(`Competitor/inspiration sites: ${competitorNames.join(", ")}.`);
-  }
+  // Add competitor context grouped by label
+  const goodComps = competitors.filter((c) => c.screenshotLabel === "good");
+  const badComps = competitors.filter((c) => c.screenshotLabel === "bad");
+  const unlabeledComps = competitors.filter((c) => !c.screenshotLabel);
 
-  const competitorNotes = competitors
-    .filter((c) => c.notes)
-    .map((c) => `${c.name}: ${c.notes!.slice(0, 150)}`)
-    .slice(0, 3);
-  if (competitorNotes.length > 0) {
-    parts.push(`Competitor notes: ${competitorNotes.join("; ")}`);
+  const formatComp = (c: Competitor) => {
+    const detail = [`${c.name} (${c.url})`];
+    if (c.preferredFeature) detail.push(`preferred feature: ${c.preferredFeature}`);
+    if (c.notes) detail.push(c.notes.slice(0, 150));
+    const refs = c.referenceImages || [];
+    const emulateCount = refs.filter(r => r.tag === "emulate").length + (c.screenshot && c.screenshotLabel !== "bad" ? 1 : 0);
+    const avoidCount = refs.filter(r => r.tag === "avoid").length + (c.screenshot && c.screenshotLabel === "bad" ? 1 : 0);
+    const untaggedCount = refs.filter(r => !r.tag).length;
+    const tagParts: string[] = [];
+    if (emulateCount > 0) tagParts.push(`${emulateCount} "emulate"`);
+    if (avoidCount > 0) tagParts.push(`${avoidCount} "avoid"`);
+    if (untaggedCount > 0) tagParts.push(`${untaggedCount} untagged`);
+    if (tagParts.length > 0) detail.push(`screenshots: ${tagParts.join(", ")}`);
+    return detail.join(" — ");
+  };
+
+  if (goodComps.length > 0) {
+    parts.push(`POSITIVE INSPIRATION — emulate these design patterns, referencing the attached screenshots:\n${goodComps.slice(0, 5).map(formatComp).join("\n")}`);
+  }
+  if (badComps.length > 0) {
+    parts.push(`NEGATIVE EXAMPLES — avoid these design patterns, as shown in the attached screenshots:\n${badComps.slice(0, 5).map(formatComp).join("\n")}`);
+  }
+  if (unlabeledComps.length > 0) {
+    parts.push(`Competitor/inspiration sites (reference screenshots attached):\n${unlabeledComps.slice(0, 5).map(formatComp).join("\n")}`);
   }
 
   if (options.customPrompt) {

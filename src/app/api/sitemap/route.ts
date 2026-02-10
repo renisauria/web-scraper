@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import { buildCurrentSitemap, buildSitemapFromUrls, enrichSitemapWithPages } from "@/lib/sitemap";
 import { fetchAndParseSitemapXml } from "@/lib/sitemap-xml";
-import { generateRecommendedSitemap } from "@/lib/openai";
+import { generateRecommendedSitemap } from "@/lib/anthropic";
 import { logError } from "@/lib/error-logger";
 import type { SitemapData } from "@/types";
 

@@ -105,7 +105,7 @@ export const competitors = sqliteTable("competitors", {
   preferredFeature: text("preferred_feature"),
   preferredFeatureUrl: text("preferred_feature_url"),
   screenshot: text("screenshot"),
-  referenceImages: text("reference_image", { mode: "json" }).$type<string[]>(),
+  referenceImages: text("reference_image", { mode: "json" }).$type<{ url: string; tag: "emulate" | "avoid" | null }[]>(),
   screenshotLabel: text("screenshot_label"),
   notes: text("notes"),
   createdAt: integer("created_at", { mode: "timestamp" })

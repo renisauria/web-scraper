@@ -47,12 +47,20 @@ import {
   BookmarkPlus,
   BookMarked,
   ChevronDown,
+  ChevronRight,
   Palette,
   ShoppingBag,
   Package,
+  Download,
+  LayoutGrid,
+  ListTree,
+  Circle,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Project, Page, Analysis, Competitor, CompetitorType, ScreenshotLabel, Mockup, SavedPrompt, DesignKit, FlatToken, Product } from "@/types";
+import type { Project, Page, Analysis, Competitor, CompetitorType, ScreenshotLabel, Mockup, SavedPrompt, DesignKit, FlatToken, Product, ReferenceImage, ReferenceImageTag } from "@/types";
+import { normalizeReferenceImages } from "@/types";
 import { parseDesignTokens } from "@/lib/design-tokens";
 import {
   Dialog,
@@ -98,13 +106,13 @@ export default function ProjectDetailPage({
   const [addingCompetitor, setAddingCompetitor] = useState(false);
   const [competitorForm, setCompetitorForm] = useState({ name: "", url: "", type: "competitor" as CompetitorType, preferredFeature: "", preferredFeatureUrl: "", notes: "", screenshotLabel: null as ScreenshotLabel | null });
   const [savingCompetitor, setSavingCompetitor] = useState(false);
-  const [referenceImages, setReferenceImages] = useState<string[]>([]);
+  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
   const [capturingCompetitorId, setCapturingCompetitorId] = useState<string | null>(null);
   const [viewingCompetitor, setViewingCompetitor] = useState<Competitor | null>(null);
   const [editingCompetitor, setEditingCompetitor] = useState(false);
   const [competitorEditForm, setCompetitorEditForm] = useState({ name: "", url: "", type: "competitor" as CompetitorType, preferredFeature: "", preferredFeatureUrl: "", notes: "", screenshotLabel: null as ScreenshotLabel | null });
   const [savingCompetitorEdit, setSavingCompetitorEdit] = useState(false);
-  const [editReferenceImages, setEditReferenceImages] = useState<string[]>([]);
+  const [editReferenceImages, setEditReferenceImages] = useState<ReferenceImage[]>([]);
   const [viewingScreenshot, setViewingScreenshot] = useState<{ url: string; title: string } | null>(null);
   const [showMockupForm, setShowMockupForm] = useState(false);
   const [mockupStyle, setMockupStyle] = useState("Modern Minimal");
@@ -130,6 +138,10 @@ export default function ProjectDetailPage({
   const [editingTokenValue, setEditingTokenValue] = useState("");
   const [extractingProducts, setExtractingProducts] = useState<string | null>(null);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [productView, setProductView] = useState<"grid" | "tree">("grid");
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
   const fetchProject = useCallback(async () => {
     try {
@@ -420,7 +432,7 @@ export default function ProjectDetailPage({
       notes: viewingCompetitor.notes || "",
       screenshotLabel: viewingCompetitor.screenshotLabel || null,
     });
-    setEditReferenceImages(viewingCompetitor.referenceImages || []);
+    setEditReferenceImages(normalizeReferenceImages(viewingCompetitor.referenceImages));
     setEditingCompetitor(true);
   }
 
@@ -846,76 +858,79 @@ export default function ProjectDetailPage({
                         disabled={savingCompetitorEdit}
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="flex flex-col gap-2">
                       <label className="text-sm font-medium">Type</label>
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 text-sm cursor-pointer">
-                          <input
-                            type="radio"
-                            name="editCompetitorType"
-                            value="competitor"
-                            checked={competitorEditForm.type === "competitor"}
-                            onChange={() => setCompetitorEditForm({ ...competitorEditForm, type: "competitor" })}
-                            disabled={savingCompetitorEdit}
-                            className="accent-primary"
-                          />
+                      <div className="flex items-center rounded-lg border bg-muted/50 p-1 gap-1 w-fit">
+                        <button
+                          type="button"
+                          onClick={() => setCompetitorEditForm({ ...competitorEditForm, type: "competitor" })}
+                          disabled={savingCompetitorEdit}
+                          className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border border-transparent ${
+                            competitorEditForm.type === "competitor"
+                              ? "bg-background border-border text-foreground shadow-sm"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          <Target className={`h-3.5 w-3.5 mr-1.5 ${competitorEditForm.type === "competitor" ? "text-foreground" : ""}`} />
                           Competitor
-                        </label>
-                        <label className="flex items-center gap-2 text-sm cursor-pointer">
-                          <input
-                            type="radio"
-                            name="editCompetitorType"
-                            value="inspiration"
-                            checked={competitorEditForm.type === "inspiration"}
-                            onChange={() => setCompetitorEditForm({ ...competitorEditForm, type: "inspiration" })}
-                            disabled={savingCompetitorEdit}
-                            className="accent-primary"
-                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCompetitorEditForm({ ...competitorEditForm, type: "inspiration" })}
+                          disabled={savingCompetitorEdit}
+                          className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border border-transparent ${
+                            competitorEditForm.type === "inspiration"
+                              ? "bg-violet-50 border-violet-200 text-violet-900 shadow-sm"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          <Sparkles className={`h-3.5 w-3.5 mr-1.5 ${competitorEditForm.type === "inspiration" ? "text-violet-600" : ""}`} />
                           Inspiration
-                        </label>
+                        </button>
                       </div>
                     </div>
-                    <div className="space-y-2">
+                    <div className="flex flex-col gap-2">
                       <label className="text-sm font-medium">Screenshot Quality</label>
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 text-sm cursor-pointer">
-                          <input
-                            type="radio"
-                            name="editScreenshotLabel"
-                            value=""
-                            checked={competitorEditForm.screenshotLabel === null}
-                            onChange={() => setCompetitorEditForm({ ...competitorEditForm, screenshotLabel: null })}
-                            disabled={savingCompetitorEdit}
-                            className="accent-primary"
-                          />
+                      <div className="flex items-center rounded-lg border bg-muted/50 p-1 gap-1 w-fit">
+                        <button
+                          type="button"
+                          onClick={() => setCompetitorEditForm({ ...competitorEditForm, screenshotLabel: null })}
+                          disabled={savingCompetitorEdit}
+                          className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border border-transparent ${
+                            competitorEditForm.screenshotLabel === null
+                              ? "bg-background border-border text-foreground shadow-sm"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          <Circle className={`h-3.5 w-3.5 mr-1.5 ${competitorEditForm.screenshotLabel === null ? "text-muted-foreground" : ""}`} />
                           Unlabeled
-                        </label>
-                        <label className="flex items-center gap-2 text-sm cursor-pointer">
-                          <input
-                            type="radio"
-                            name="editScreenshotLabel"
-                            value="good"
-                            checked={competitorEditForm.screenshotLabel === "good"}
-                            onChange={() => setCompetitorEditForm({ ...competitorEditForm, screenshotLabel: "good" })}
-                            disabled={savingCompetitorEdit}
-                            className="accent-primary"
-                          />
-                          <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCompetitorEditForm({ ...competitorEditForm, screenshotLabel: "good" })}
+                          disabled={savingCompetitorEdit}
+                          className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border border-transparent ${
+                            competitorEditForm.screenshotLabel === "good"
+                              ? "bg-emerald-50 border-emerald-200 text-emerald-900 shadow-sm"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          <ThumbsUp className={`h-3.5 w-3.5 mr-1.5 ${competitorEditForm.screenshotLabel === "good" ? "text-emerald-600" : ""}`} />
                           Good Inspiration
-                        </label>
-                        <label className="flex items-center gap-2 text-sm cursor-pointer">
-                          <input
-                            type="radio"
-                            name="editScreenshotLabel"
-                            value="bad"
-                            checked={competitorEditForm.screenshotLabel === "bad"}
-                            onChange={() => setCompetitorEditForm({ ...competitorEditForm, screenshotLabel: "bad" })}
-                            disabled={savingCompetitorEdit}
-                            className="accent-primary"
-                          />
-                          <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCompetitorEditForm({ ...competitorEditForm, screenshotLabel: "bad" })}
+                          disabled={savingCompetitorEdit}
+                          className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border border-transparent ${
+                            competitorEditForm.screenshotLabel === "bad"
+                              ? "bg-rose-50 border-rose-200 text-rose-900 shadow-sm"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          <ThumbsDown className={`h-3.5 w-3.5 mr-1.5 ${competitorEditForm.screenshotLabel === "bad" ? "text-rose-600" : ""}`} />
                           Bad Example
-                        </label>
+                        </button>
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -950,24 +965,48 @@ export default function ProjectDetailPage({
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Reference screenshots</label>
                       {editReferenceImages.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-3">
                           {editReferenceImages.map((img, i) => (
-                            <div key={i} className="relative group/thumb">
-                              <img
-                                src={img}
-                                alt={`Reference ${i + 1}`}
-                                className="rounded-md border h-20 w-20 object-cover"
-                              />
-                              <button
-                                type="button"
-                                className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center text-xs opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                                onClick={() =>
-                                  setEditReferenceImages((prev) => prev.filter((_, j) => j !== i))
-                                }
-                                disabled={savingCompetitorEdit}
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
+                            <div key={i} className="relative group/thumb flex flex-col items-center gap-1">
+                              <div className="relative">
+                                <img
+                                  src={img.url}
+                                  alt={`Reference ${i + 1}`}
+                                  className={`rounded-md border-2 h-20 w-20 object-cover ${img.tag === "emulate" ? "border-green-500" : img.tag === "avoid" ? "border-red-500" : "border-border"}`}
+                                />
+                                <button
+                                  type="button"
+                                  className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center text-xs opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                                  onClick={() =>
+                                    setEditReferenceImages((prev) => prev.filter((_, j) => j !== i))
+                                  }
+                                  disabled={savingCompetitorEdit}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                              <div className="flex gap-1">
+                                <button
+                                  type="button"
+                                  className={`px-1.5 py-0.5 text-[10px] rounded font-medium transition-colors ${img.tag === "emulate" ? "bg-green-100 text-green-700 ring-1 ring-green-400" : "bg-muted text-muted-foreground hover:bg-green-50 hover:text-green-700"}`}
+                                  onClick={() =>
+                                    setEditReferenceImages((prev) => prev.map((r, j) => j === i ? { ...r, tag: r.tag === "emulate" ? null : "emulate" } : r))
+                                  }
+                                  disabled={savingCompetitorEdit}
+                                >
+                                  Emulate
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`px-1.5 py-0.5 text-[10px] rounded font-medium transition-colors ${img.tag === "avoid" ? "bg-red-100 text-red-700 ring-1 ring-red-400" : "bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-700"}`}
+                                  onClick={() =>
+                                    setEditReferenceImages((prev) => prev.map((r, j) => j === i ? { ...r, tag: r.tag === "avoid" ? null : "avoid" } : r))
+                                  }
+                                  disabled={savingCompetitorEdit}
+                                >
+                                  Avoid
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -986,7 +1025,7 @@ export default function ProjectDetailPage({
                             files.forEach((file) => {
                               const reader = new FileReader();
                               reader.onloadend = () => {
-                                setEditReferenceImages((prev) => [...prev, reader.result as string]);
+                                setEditReferenceImages((prev) => [...prev, { url: reader.result as string, tag: null }]);
                               };
                               reader.readAsDataURL(file);
                             });
@@ -1086,25 +1125,31 @@ export default function ProjectDetailPage({
                       <p className="text-sm font-medium mb-2">
                         Reference Screenshots ({viewingCompetitor.referenceImages.length})
                       </p>
-                      <div className="flex flex-wrap gap-2">
-                        {viewingCompetitor.referenceImages.map((img, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            className="group/ref cursor-pointer"
-                            onClick={() =>
-                              setViewingScreenshot({
-                                url: img,
-                                title: `${viewingCompetitor.name} — Reference ${i + 1}`,
-                              })
-                            }
-                          >
-                            <img
-                              src={img}
-                              alt={`Reference ${i + 1}`}
-                              className="rounded-md border h-24 w-24 object-cover group-hover/ref:ring-2 group-hover/ref:ring-primary transition-all"
-                            />
-                          </button>
+                      <div className="flex flex-wrap gap-3">
+                        {normalizeReferenceImages(viewingCompetitor.referenceImages).map((img, i) => (
+                          <div key={i} className="flex flex-col items-center gap-1">
+                            <button
+                              type="button"
+                              className="group/ref cursor-pointer"
+                              onClick={() =>
+                                setViewingScreenshot({
+                                  url: img.url,
+                                  title: `${viewingCompetitor.name} — Reference ${i + 1}${img.tag ? ` (${img.tag})` : ""}`,
+                                })
+                              }
+                            >
+                              <img
+                                src={img.url}
+                                alt={`Reference ${i + 1}`}
+                                className={`rounded-md border-2 h-24 w-24 object-cover group-hover/ref:ring-2 group-hover/ref:ring-primary transition-all ${img.tag === "emulate" ? "border-green-500" : img.tag === "avoid" ? "border-red-500" : "border-border"}`}
+                              />
+                            </button>
+                            {img.tag && (
+                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${img.tag === "emulate" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                                {img.tag === "emulate" ? "Emulate" : "Avoid"}
+                              </span>
+                            )}
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -1664,76 +1709,79 @@ export default function ProjectDetailPage({
                   disabled={savingCompetitor}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium">Type</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="radio"
-                      name="competitorType"
-                      value="competitor"
-                      checked={competitorForm.type === "competitor"}
-                      onChange={() => setCompetitorForm({ ...competitorForm, type: "competitor" })}
-                      disabled={savingCompetitor}
-                      className="accent-primary"
-                    />
+                <div className="flex items-center rounded-lg border bg-muted/50 p-1 gap-1 w-fit">
+                  <button
+                    type="button"
+                    onClick={() => setCompetitorForm({ ...competitorForm, type: "competitor" })}
+                    disabled={savingCompetitor}
+                    className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border border-transparent ${
+                      competitorForm.type === "competitor"
+                        ? "bg-background border-border text-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <Target className={`h-3.5 w-3.5 mr-1.5 ${competitorForm.type === "competitor" ? "text-foreground" : ""}`} />
                     Competitor
-                  </label>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="radio"
-                      name="competitorType"
-                      value="inspiration"
-                      checked={competitorForm.type === "inspiration"}
-                      onChange={() => setCompetitorForm({ ...competitorForm, type: "inspiration" })}
-                      disabled={savingCompetitor}
-                      className="accent-primary"
-                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCompetitorForm({ ...competitorForm, type: "inspiration" })}
+                    disabled={savingCompetitor}
+                    className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border border-transparent ${
+                      competitorForm.type === "inspiration"
+                        ? "bg-violet-50 border-violet-200 text-violet-900 shadow-sm"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <Sparkles className={`h-3.5 w-3.5 mr-1.5 ${competitorForm.type === "inspiration" ? "text-violet-600" : ""}`} />
                     Inspiration
-                  </label>
+                  </button>
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium">Screenshot Quality (optional)</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="radio"
-                      name="screenshotLabel"
-                      value=""
-                      checked={competitorForm.screenshotLabel === null}
-                      onChange={() => setCompetitorForm({ ...competitorForm, screenshotLabel: null })}
-                      disabled={savingCompetitor}
-                      className="accent-primary"
-                    />
+                <div className="flex items-center rounded-lg border bg-muted/50 p-1 gap-1 w-fit">
+                  <button
+                    type="button"
+                    onClick={() => setCompetitorForm({ ...competitorForm, screenshotLabel: null })}
+                    disabled={savingCompetitor}
+                    className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border border-transparent ${
+                      competitorForm.screenshotLabel === null
+                        ? "bg-background border-border text-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <Circle className={`h-3.5 w-3.5 mr-1.5 ${competitorForm.screenshotLabel === null ? "text-muted-foreground" : ""}`} />
                     Unlabeled
-                  </label>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="radio"
-                      name="screenshotLabel"
-                      value="good"
-                      checked={competitorForm.screenshotLabel === "good"}
-                      onChange={() => setCompetitorForm({ ...competitorForm, screenshotLabel: "good" })}
-                      disabled={savingCompetitor}
-                      className="accent-primary"
-                    />
-                    <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCompetitorForm({ ...competitorForm, screenshotLabel: "good" })}
+                    disabled={savingCompetitor}
+                    className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border border-transparent ${
+                      competitorForm.screenshotLabel === "good"
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-900 shadow-sm"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <ThumbsUp className={`h-3.5 w-3.5 mr-1.5 ${competitorForm.screenshotLabel === "good" ? "text-emerald-600" : ""}`} />
                     Good Inspiration
-                  </label>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="radio"
-                      name="screenshotLabel"
-                      value="bad"
-                      checked={competitorForm.screenshotLabel === "bad"}
-                      onChange={() => setCompetitorForm({ ...competitorForm, screenshotLabel: "bad" })}
-                      disabled={savingCompetitor}
-                      className="accent-primary"
-                    />
-                    <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCompetitorForm({ ...competitorForm, screenshotLabel: "bad" })}
+                    disabled={savingCompetitor}
+                    className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border border-transparent ${
+                      competitorForm.screenshotLabel === "bad"
+                        ? "bg-rose-50 border-rose-200 text-rose-900 shadow-sm"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <ThumbsDown className={`h-3.5 w-3.5 mr-1.5 ${competitorForm.screenshotLabel === "bad" ? "text-rose-600" : ""}`} />
                     Bad Example
-                  </label>
+                  </button>
                 </div>
               </div>
               <div className="space-y-2">
@@ -1775,7 +1823,7 @@ export default function ProjectDetailPage({
                       files.forEach((file) => {
                         const reader = new FileReader();
                         reader.onloadend = () => {
-                          setReferenceImages((prev) => [...prev, reader.result as string]);
+                          setReferenceImages((prev) => [...prev, { url: reader.result as string, tag: null }]);
                         };
                         reader.readAsDataURL(file);
                       });
@@ -1784,29 +1832,51 @@ export default function ProjectDetailPage({
                   />
                 </label>
                 {referenceImages.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
+                  <div className="flex flex-wrap gap-3 mt-2">
                     {referenceImages.map((img, i) => (
-                      <div key={i} className="relative group/thumb">
-                        <img
-                          src={img}
-                          alt={`Reference ${i + 1}`}
-                          className="rounded-md border h-20 w-20 object-cover"
-                        />
-                        <button
-                          type="button"
-                          className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center text-xs opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                          onClick={() =>
-                            setReferenceImages((prev) => prev.filter((_, j) => j !== i))
-                          }
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
+                      <div key={i} className="relative group/thumb flex flex-col items-center gap-1">
+                        <div className="relative">
+                          <img
+                            src={img.url}
+                            alt={`Reference ${i + 1}`}
+                            className={`rounded-md border-2 h-20 w-20 object-cover ${img.tag === "emulate" ? "border-green-500" : img.tag === "avoid" ? "border-red-500" : "border-border"}`}
+                          />
+                          <button
+                            type="button"
+                            className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center text-xs opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                            onClick={() =>
+                              setReferenceImages((prev) => prev.filter((_, j) => j !== i))
+                            }
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            className={`px-1.5 py-0.5 text-[10px] rounded font-medium transition-colors ${img.tag === "emulate" ? "bg-green-100 text-green-700 ring-1 ring-green-400" : "bg-muted text-muted-foreground hover:bg-green-50 hover:text-green-700"}`}
+                            onClick={() =>
+                              setReferenceImages((prev) => prev.map((r, j) => j === i ? { ...r, tag: r.tag === "emulate" ? null : "emulate" } : r))
+                            }
+                          >
+                            Emulate
+                          </button>
+                          <button
+                            type="button"
+                            className={`px-1.5 py-0.5 text-[10px] rounded font-medium transition-colors ${img.tag === "avoid" ? "bg-red-100 text-red-700 ring-1 ring-red-400" : "bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-700"}`}
+                            onClick={() =>
+                              setReferenceImages((prev) => prev.map((r, j) => j === i ? { ...r, tag: r.tag === "avoid" ? null : "avoid" } : r))
+                            }
+                          >
+                            Avoid
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Upload screenshots for AI image generation reference
+                  Upload screenshots and tag each as "Emulate" (use as inspiration) or "Avoid" (things to stay away from)
                 </p>
               </div>
               <div className="space-y-2">
@@ -1858,7 +1928,8 @@ export default function ProjectDetailPage({
           {competitors.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {competitors.map((comp) => {
-                const thumbSrc = comp.referenceImages?.[0] || comp.screenshot;
+                const normalizedRefs = normalizeReferenceImages(comp.referenceImages);
+                const thumbSrc = normalizedRefs[0]?.url || comp.screenshot;
                 return (
                 <button
                   key={comp.id}
@@ -2198,57 +2269,346 @@ export default function ProjectDetailPage({
       {products.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Extracted Products
-            </CardTitle>
-            <CardDescription>
-              {products.length} product{products.length !== 1 ? "s" : ""} extracted from scraped pages
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Extracted Products
+                </CardTitle>
+                <CardDescription>
+                  {products.length} product{products.length !== 1 ? "s" : ""} extracted from scraped pages
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center rounded-md border">
+                  <button
+                    type="button"
+                    onClick={() => setProductView("grid")}
+                    className={`p-1.5 rounded-l-md transition-colors ${productView === "grid" ? "bg-muted" : "hover:bg-muted/50"}`}
+                    title="Grid view"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProductView("tree")}
+                    className={`p-1.5 rounded-r-md transition-colors ${productView === "tree" ? "bg-muted" : "hover:bg-muted/50"}`}
+                    title="Tree view"
+                  >
+                    <ListTree className="h-4 w-4" />
+                  </button>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const grouped: Record<string, Product[]> = {};
+                    products.forEach((p) => {
+                      const cat = p.category || "Uncategorized";
+                      if (!grouped[cat]) grouped[cat] = [];
+                      grouped[cat].push(p);
+                    });
+                    const exportData = {
+                      projectName: project.name,
+                      projectUrl: project.url,
+                      exportedAt: new Date().toISOString(),
+                      totalProducts: products.length,
+                      categories: Object.entries(grouped).map(([name, prods]) => ({
+                        name,
+                        products: prods.map((p) => ({
+                          name: p.name,
+                          price: p.price,
+                          currency: p.currency,
+                          description: p.description,
+                          brand: p.brand,
+                          sku: p.sku,
+                          availability: p.availability,
+                          variants: p.variants,
+                          specifications: p.specifications,
+                          images: p.images,
+                          category: p.category,
+                        })),
+                      })),
+                    };
+                    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `${project.name}-products.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Export JSON
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {products.map((product) => (
-                <div
-                  key={product.id}
-                  className="group relative flex flex-col rounded-lg border overflow-hidden hover:border-primary/50 hover:shadow-md transition-all p-3 space-y-2"
-                >
-                  {product.images && product.images.length > 0 && (
-                    <div className="relative aspect-video bg-muted overflow-hidden rounded-md">
-                      <img
-                        src={product.images[0]}
-                        alt={product.name}
-                        className="w-full h-full object-cover object-center"
-                      />
+            {productView === "grid" ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {products.map((product) => (
+                  <div
+                    key={product.id}
+                    className="group relative flex flex-col rounded-lg border overflow-hidden hover:border-primary/50 hover:shadow-md transition-all p-3 space-y-2"
+                  >
+                    {product.images && product.images.length > 0 && (
+                      <div className="relative aspect-video bg-muted overflow-hidden rounded-md">
+                        <img
+                          src={product.images[0]}
+                          alt={product.name}
+                          className="w-full h-full object-cover object-center"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-medium text-sm truncate">{product.name}</p>
+                      {product.price && (
+                        <p className="text-sm text-muted-foreground">{product.price}</p>
+                      )}
+                      {product.variants && product.variants.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {product.variants.length} variant{product.variants.length !== 1 ? "s" : ""}
+                        </p>
+                      )}
+                      {product.brand && (
+                        <p className="text-xs text-muted-foreground">{product.brand}</p>
+                      )}
                     </div>
-                  )}
-                  <div>
-                    <p className="font-medium text-sm truncate">{product.name}</p>
-                    {product.price && (
-                      <p className="text-sm text-muted-foreground">{product.price}</p>
-                    )}
-                    {product.variants && product.variants.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {product.variants.length} variant{product.variants.length !== 1 ? "s" : ""}
-                      </p>
-                    )}
-                    {product.brand && (
-                      <p className="text-xs text-muted-foreground">{product.brand}</p>
-                    )}
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-destructive"
+                        onClick={() => handleDeleteProduct(product.id)}
+                        title="Delete product"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-destructive"
-                      onClick={() => handleDeleteProduct(product.id)}
-                      title="Delete product"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {(() => {
+                  const grouped: Record<string, Product[]> = {};
+                  products.forEach((p) => {
+                    const cat = p.category || "Uncategorized";
+                    if (!grouped[cat]) grouped[cat] = [];
+                    grouped[cat].push(p);
+                  });
+                  return Object.entries(grouped).map(([category, catProducts]) => {
+                    const catExpanded = expandedCategories.has(category);
+                    return (
+                      <div key={category}>
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 w-full py-1.5 px-2 rounded-md hover:bg-muted/50 transition-colors text-left"
+                          onClick={() => {
+                            setExpandedCategories((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(category)) next.delete(category);
+                              else next.add(category);
+                              return next;
+                            });
+                          }}
+                        >
+                          {catExpanded ? (
+                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          )}
+                          <Package className="h-4 w-4 shrink-0" />
+                          <span className="font-medium text-sm">{category}</span>
+                          <Badge variant="secondary" className="ml-auto text-xs">
+                            {catProducts.length}
+                          </Badge>
+                        </button>
+                        {catExpanded && (
+                          <div className="ml-4 pl-2 border-l border-border">
+                            {catProducts.map((product) => {
+                              const prodExpanded = expandedProducts.has(product.id);
+                              const hasVariants = product.variants && product.variants.length > 0;
+                              const hasSpecs = product.specifications && Object.keys(product.specifications).length > 0;
+                              const hasImages = product.images && product.images.length > 0;
+                              const hasChildren = hasVariants || hasSpecs || hasImages;
+                              return (
+                                <div key={product.id}>
+                                  <div className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 transition-colors group">
+                                    <button
+                                      type="button"
+                                      className={`shrink-0 ${hasChildren ? "cursor-pointer text-muted-foreground hover:text-foreground" : "invisible"}`}
+                                      onClick={() => {
+                                        if (!hasChildren) return;
+                                        setExpandedProducts((prev) => {
+                                          const next = new Set(prev);
+                                          if (next.has(product.id)) next.delete(product.id);
+                                          else next.add(product.id);
+                                          return next;
+                                        });
+                                      }}
+                                    >
+                                      {prodExpanded ? (
+                                        <ChevronDown className="h-4 w-4" />
+                                      ) : (
+                                        <ChevronRight className="h-4 w-4" />
+                                      )}
+                                    </button>
+                                    <span className="text-sm truncate">{product.name}</span>
+                                    {product.price && (
+                                      <span className="text-sm text-muted-foreground shrink-0">
+                                        &mdash; {product.price}
+                                      </span>
+                                    )}
+                                    {product.brand && (
+                                      <Badge variant="outline" className="ml-auto text-xs shrink-0">
+                                        {product.brand}
+                                      </Badge>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="h-6 w-6 rounded-full text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive flex items-center justify-center shrink-0"
+                                      onClick={() => handleDeleteProduct(product.id)}
+                                      title="Delete product"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                  {prodExpanded && hasChildren && (
+                                    <div className="ml-4 pl-2 border-l border-border">
+                                      {hasVariants && (() => {
+                                        const secKey = `${product.id}-variants`;
+                                        const secExpanded = expandedSections.has(secKey);
+                                        return (
+                                          <div>
+                                            <button
+                                              type="button"
+                                              className="flex items-center gap-2 w-full py-1 px-2 rounded-md hover:bg-muted/50 transition-colors text-left"
+                                              onClick={() => {
+                                                setExpandedSections((prev) => {
+                                                  const next = new Set(prev);
+                                                  if (next.has(secKey)) next.delete(secKey);
+                                                  else next.add(secKey);
+                                                  return next;
+                                                });
+                                              }}
+                                            >
+                                              {secExpanded ? (
+                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                              ) : (
+                                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                              )}
+                                              <span className="text-xs font-medium text-muted-foreground">Variants</span>
+                                            </button>
+                                            {secExpanded && (
+                                              <div className="ml-4 pl-2 border-l border-border">
+                                                {product.variants!.map((v, i) => (
+                                                  <div key={i} className="py-1 px-2 text-xs text-muted-foreground">
+                                                    <span className="font-medium">{v.name}:</span> {v.options.join(", ")}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
+                                      {hasSpecs && (() => {
+                                        const secKey = `${product.id}-specs`;
+                                        const secExpanded = expandedSections.has(secKey);
+                                        return (
+                                          <div>
+                                            <button
+                                              type="button"
+                                              className="flex items-center gap-2 w-full py-1 px-2 rounded-md hover:bg-muted/50 transition-colors text-left"
+                                              onClick={() => {
+                                                setExpandedSections((prev) => {
+                                                  const next = new Set(prev);
+                                                  if (next.has(secKey)) next.delete(secKey);
+                                                  else next.add(secKey);
+                                                  return next;
+                                                });
+                                              }}
+                                            >
+                                              {secExpanded ? (
+                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                              ) : (
+                                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                              )}
+                                              <span className="text-xs font-medium text-muted-foreground">Specifications</span>
+                                            </button>
+                                            {secExpanded && (
+                                              <div className="ml-4 pl-2 border-l border-border">
+                                                {Object.entries(product.specifications!).map(([key, val]) => (
+                                                  <div key={key} className="py-1 px-2 text-xs text-muted-foreground">
+                                                    <span className="font-medium">{key}:</span> {val}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
+                                      {hasImages && (() => {
+                                        const secKey = `${product.id}-images`;
+                                        const secExpanded = expandedSections.has(secKey);
+                                        return (
+                                          <div>
+                                            <button
+                                              type="button"
+                                              className="flex items-center gap-2 w-full py-1 px-2 rounded-md hover:bg-muted/50 transition-colors text-left"
+                                              onClick={() => {
+                                                setExpandedSections((prev) => {
+                                                  const next = new Set(prev);
+                                                  if (next.has(secKey)) next.delete(secKey);
+                                                  else next.add(secKey);
+                                                  return next;
+                                                });
+                                              }}
+                                            >
+                                              {secExpanded ? (
+                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                              ) : (
+                                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                              )}
+                                              <span className="text-xs font-medium text-muted-foreground">
+                                                Images ({product.images!.length})
+                                              </span>
+                                            </button>
+                                            {secExpanded && (
+                                              <div className="ml-4 pl-2 border-l border-border">
+                                                {product.images!.map((img, i) => (
+                                                  <div key={i} className="py-1 px-2 text-xs text-muted-foreground truncate">
+                                                    <a
+                                                      href={img}
+                                                      target="_blank"
+                                                      rel="noopener noreferrer"
+                                                      className="hover:underline hover:text-foreground"
+                                                    >
+                                                      {img}
+                                                    </a>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

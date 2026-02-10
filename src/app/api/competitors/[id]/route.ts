@@ -12,7 +12,10 @@ const updateCompetitorSchema = z.object({
   preferredFeature: z.string().optional(),
   preferredFeatureUrl: z.string().url().optional().or(z.literal("")),
   notes: z.string().optional(),
-  referenceImages: z.array(z.string()).optional(),
+  referenceImages: z.array(z.object({
+    url: z.string(),
+    tag: z.enum(["emulate", "avoid"]).nullable(),
+  })).optional(),
   screenshotLabel: z.enum(["good", "bad"]).nullable().optional(),
 });
 

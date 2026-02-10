@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { generateMockupPrompt } from "@/lib/openai";
+import { generateMockupPrompt } from "@/lib/anthropic";
 import { parseDesignTokens, formatTokensForPrompt } from "@/lib/design-tokens";
 import { formatProductsForPrompt } from "@/lib/product-formatter";
 import { logError } from "@/lib/error-logger";
+import { normalizeReferenceImages } from "@/types";
 import type { Project, Analysis, Competitor, Product } from "@/types";
 
 const generatePromptSchema = z.object({
@@ -46,12 +47,18 @@ export async function POST(request: NextRequest) {
         eq(schema.analyses.projectId, projectId)
       )) as unknown as Analysis[];
 
-    const competitors = (await db
+    const rawCompetitors = (await db
       .select()
       .from(schema.competitors)
       .where(
         eq(schema.competitors.projectId, projectId)
       )) as unknown as Competitor[];
+
+    // Normalize legacy string[] referenceImages to ReferenceImage[]
+    const competitors = rawCompetitors.map(c => ({
+      ...c,
+      referenceImages: normalizeReferenceImages(c.referenceImages),
+    }));
 
     // Fetch design kit for the project and format tokens for prompt
     let designTokensContext: string | undefined;
@@ -84,7 +91,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate the prompt via GPT-4
+    // Generate the prompt via Claude
     const result = await generateMockupPrompt(project, analyses, competitors, {
       style,
       pageType,

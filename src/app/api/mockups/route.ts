@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import { generateMockup } from "@/lib/gemini";
 import { logError } from "@/lib/error-logger";
+import { normalizeReferenceImages } from "@/types";
 import type { Competitor } from "@/types";
 
 export const maxDuration = 120;
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Collect reference images from competitors, grouped by label
+    // Collect reference images from competitors, grouped by tag
     const competitors = (await db
       .select()
       .from(schema.competitors)
@@ -50,17 +51,27 @@ export async function POST(request: NextRequest) {
       goodReferenceImages.push(...extraReferenceImages);
     }
 
-    // Group competitor images by label
+    // Group competitor images: auto-captured screenshot uses competitor-level label,
+    // user-uploaded reference images use their individual per-image tags
     for (const comp of competitors) {
-      const images: string[] = [];
-      if (comp.screenshot) images.push(comp.screenshot);
-      if (comp.referenceImages) images.push(...comp.referenceImages);
+      // Auto-captured screenshot uses competitor-level screenshotLabel
+      if (comp.screenshot) {
+        if (comp.screenshotLabel === "bad") {
+          badReferenceImages.push(comp.screenshot);
+        } else {
+          goodReferenceImages.push(comp.screenshot);
+        }
+      }
 
-      if (comp.screenshotLabel === "bad") {
-        badReferenceImages.push(...images);
-      } else {
-        // good + unlabeled → positive references
-        goodReferenceImages.push(...images);
+      // Per-image tagged reference images
+      const refImages = normalizeReferenceImages(comp.referenceImages);
+      for (const img of refImages) {
+        if (img.tag === "avoid") {
+          badReferenceImages.push(img.url);
+        } else {
+          // "emulate" + untagged → positive references
+          goodReferenceImages.push(img.url);
+        }
       }
     }
 

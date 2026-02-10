@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
-import { analyzeContent, analyzeAll, type AnalysisType } from "@/lib/openai";
+import { analyzeContent, analyzeAll, type AnalysisType } from "@/lib/anthropic";
 import { z } from "zod";
 import { logError } from "@/lib/error-logger";
 

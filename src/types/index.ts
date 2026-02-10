@@ -198,6 +198,21 @@ export interface RecommendationsAnalysis {
 
 export type CompetitorType = "competitor" | "inspiration";
 export type ScreenshotLabel = "good" | "bad";
+export type ReferenceImageTag = "emulate" | "avoid";
+
+export interface ReferenceImage {
+  url: string;
+  tag: ReferenceImageTag | null;
+}
+
+/** Normalize legacy string[] or new ReferenceImage[] from DB JSON */
+export function normalizeReferenceImages(raw: unknown): ReferenceImage[] {
+  if (!raw || !Array.isArray(raw)) return [];
+  return raw.map((item) => {
+    if (typeof item === "string") return { url: item, tag: null };
+    return item as ReferenceImage;
+  });
+}
 
 export interface Competitor {
   id: string;
@@ -208,7 +223,7 @@ export interface Competitor {
   preferredFeature: string | null;
   preferredFeatureUrl: string | null;
   screenshot: string | null;
-  referenceImages: string[] | null;
+  referenceImages: ReferenceImage[] | null;
   screenshotLabel: ScreenshotLabel | null;
   notes: string | null;
   createdAt: Date;

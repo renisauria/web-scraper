@@ -3,7 +3,7 @@ import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
-import { extractProductsFromContent } from "@/lib/product-extractor";
+import { extractProductsFromContent } from "@/lib/anthropic";
 import { logError } from "@/lib/error-logger";
 
 const extractSchema = z.object({
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Extract products using GPT-4
+    // Extract products using Claude
     const result = await extractProductsFromContent(page.content, page.url);
 
     if (!result.success) {
