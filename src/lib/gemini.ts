@@ -1,9 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 import type { Project, Analysis, Competitor } from "@/types";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GOOGLE_AI_API_KEY!,
-});
+let _ai: GoogleGenAI | null = null;
+
+function getAI(): GoogleGenAI {
+  if (!_ai) {
+    _ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY! });
+  }
+  return _ai;
+}
 
 export function buildMockupPrompt(
   project: Project,
@@ -185,7 +190,7 @@ export async function generateMockup(
   // 4. Text prompt last
   contents.push({ text: prompt });
 
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: "gemini-3-pro-image-preview",
     contents: [{ role: "user", parts: contents }],
     config: {
