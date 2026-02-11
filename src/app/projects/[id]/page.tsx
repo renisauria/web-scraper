@@ -61,7 +61,7 @@ import {
   Monitor,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Project, Page, Analysis, Competitor, CompetitorType, ScreenshotLabel, Mockup, SavedPrompt, DesignKit, FlatToken, Product, ReferenceImage, ReferenceImageTag, PlatformInfo } from "@/types";
+import type { Project, Page, Analysis, Competitor, CompetitorType, ScreenshotLabel, Mockup, SavedPrompt, DesignKit, Product, ReferenceImage } from "@/types";
 import { normalizeReferenceImages } from "@/types";
 import { parseDesignTokens } from "@/lib/design-tokens";
 import {
@@ -2012,7 +2012,7 @@ export default function ProjectDetailPage({
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Upload screenshots and tag each as "Emulate" (use as inspiration) or "Avoid" (things to stay away from)
+                  Upload screenshots and tag each as &ldquo;Emulate&rdquo; (use as inspiration) or &ldquo;Avoid&rdquo; (things to stay away from)
                 </p>
               </div>
               <div className="space-y-2">
