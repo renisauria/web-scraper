@@ -33,7 +33,6 @@ import {
   Maximize2,
   Trash2,
   ShoppingBag,
-  Package,
   DollarSign,
   Tag,
   Layers,
