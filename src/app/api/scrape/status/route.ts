@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { getCrawlStatus } from "@/lib/firecrawl";
+import { detectPlatform } from "@/lib/platform-detector";
 import { logError } from "@/lib/error-logger";
 
 export async function GET(request: NextRequest) {
@@ -81,11 +82,20 @@ export async function GET(request: NextRequest) {
         await db.insert(schema.pages).values(pageRecords);
       }
 
+      // Run platform detection on raw HTML + metadata
+      const detectionInput = crawlStatus.pages.map((page) => ({
+        url: page.url,
+        html: page.content || undefined,
+        metadata: page.metadata || undefined,
+      }));
+      const platformInfo = detectPlatform(detectionInput);
+
       await db
         .update(schema.projects)
         .set({
           status: "scraped",
           crawlJobId: null,
+          platformInfo,
           updatedAt: new Date(),
         })
         .where(eq(schema.projects.id, projectId));

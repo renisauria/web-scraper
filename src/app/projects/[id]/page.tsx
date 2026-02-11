@@ -57,9 +57,11 @@ import {
   Circle,
   ThumbsUp,
   ThumbsDown,
+  Star,
+  Monitor,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Project, Page, Analysis, Competitor, CompetitorType, ScreenshotLabel, Mockup, SavedPrompt, DesignKit, FlatToken, Product, ReferenceImage, ReferenceImageTag } from "@/types";
+import type { Project, Page, Analysis, Competitor, CompetitorType, ScreenshotLabel, Mockup, SavedPrompt, DesignKit, FlatToken, Product, ReferenceImage, ReferenceImageTag, PlatformInfo } from "@/types";
 import { normalizeReferenceImages } from "@/types";
 import { parseDesignTokens } from "@/lib/design-tokens";
 import {
@@ -123,6 +125,8 @@ export default function ProjectDetailPage({
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [editedPrompt, setEditedPrompt] = useState("");
   const [mockupRefImages, setMockupRefImages] = useState<string[]>([]);
+  const [primaryRefIndex, setPrimaryRefIndex] = useState<number | null>(null);
+  const [mockupFormTouched, setMockupFormTouched] = useState(false);
   const [mockupStyleRef, setMockupStyleRef] = useState("");
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [promptName, setPromptName] = useState("");
@@ -489,6 +493,8 @@ export default function ProjectDetailPage({
           pageType: mockupPageType,
           customInstructions: mockupCustomPrompt.trim() || undefined,
           selectedProductIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
+          hasPrimaryReference: primaryRefIndex !== null,
+          referenceImageCount: mockupRefImages.length,
         }),
       });
 
@@ -531,6 +537,7 @@ export default function ProjectDetailPage({
           label: mockupPageType,
           style: mockupStyle,
           extraReferenceImages: mockupRefImages.length > 0 ? mockupRefImages : undefined,
+          primaryReferenceImageIndex: mockupRefImages.length > 0 && primaryRefIndex !== null ? primaryRefIndex : undefined,
           originalPrompt: generatedPrompt || undefined,
           customInstructions: mockupCustomPrompt.trim() || undefined,
           styleRef: mockupStyleRef.trim() || undefined,
@@ -547,6 +554,8 @@ export default function ProjectDetailPage({
       setEditedPrompt("");
       setMockupCustomPrompt("");
       setMockupRefImages([]);
+      setPrimaryRefIndex(null);
+      setMockupFormTouched(false);
       setMockupStyleRef("");
       await fetchProject();
       toast.success("Mockup generated!");
@@ -1506,6 +1515,133 @@ export default function ProjectDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      {/* Platform Detection */}
+      {project.platformInfo && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Monitor className="h-5 w-5" />
+                  Platform Detection
+                </CardTitle>
+                <CardDescription>
+                  Detected during website scraping
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={
+                  project.platformInfo.confidence === "high" ? "default" :
+                  project.platformInfo.confidence === "medium" ? "secondary" : "outline"
+                }>
+                  {project.platformInfo.confidence} confidence
+                </Badge>
+                <Badge variant="outline" className="capitalize">
+                  {project.platformInfo.platform}
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Shopify details */}
+            {project.platformInfo.platform === "shopify" && project.platformInfo.shopify && (
+              <div className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <p className="text-xs text-muted-foreground mb-1">Theme Name</p>
+                    <p className="font-medium">{project.platformInfo.shopify.themeName || "Unknown"}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <p className="text-xs text-muted-foreground mb-1">Theme ID</p>
+                    <p className="font-medium">{project.platformInfo.shopify.themeId || "Unknown"}</p>
+                  </div>
+                </div>
+                {project.platformInfo.shopify.templates.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium mb-2">Templates Detected</p>
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/50">
+                            <th className="text-left px-3 py-2 font-medium">Template</th>
+                            <th className="text-left px-3 py-2 font-medium">Pages</th>
+                            <th className="text-left px-3 py-2 font-medium">Sample URLs</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {project.platformInfo.shopify.templates.map((tmpl) => (
+                            <tr key={tmpl.name} className="border-t">
+                              <td className="px-3 py-2">
+                                <Badge variant="outline">{tmpl.name}</Badge>
+                              </td>
+                              <td className="px-3 py-2">{tmpl.count}</td>
+                              <td className="px-3 py-2">
+                                <div className="space-y-0.5">
+                                  {tmpl.pages.slice(0, 3).map((url) => (
+                                    <a
+                                      key={url}
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="block text-xs text-blue-600 hover:underline truncate max-w-[300px]"
+                                    >
+                                      {new URL(url).pathname}
+                                    </a>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* WordPress details */}
+            {project.platformInfo.platform === "wordpress" && project.platformInfo.wordpress && (
+              <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">Theme Name</p>
+                  <p className="font-medium">{project.platformInfo.wordpress.themeName || "Unknown"}</p>
+                </div>
+                {project.platformInfo.wordpress.plugins.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium mb-2">Detected Plugins</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {project.platformInfo.wordpress.plugins.map((plugin) => (
+                        <Badge key={plugin} variant="outline">{plugin}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Detection signals */}
+            {project.platformInfo.signals.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">Detection Signals</p>
+                <ul className="space-y-1">
+                  {project.platformInfo.signals.map((signal, i) => (
+                    <li key={i} className="text-sm text-muted-foreground flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
+                      {signal}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground">
+              Detected on {new Date(project.platformInfo.detectedAt).toLocaleDateString()}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="lg:col-span-3">
         <CardHeader>
@@ -2640,42 +2776,147 @@ export default function ProjectDetailPage({
         <CardContent>
           {/* Step 1: Settings Form */}
           {showMockupForm && (
-            <div className="space-y-3 mb-6 p-4 rounded-lg border bg-muted/30">
+            <div className="space-y-4 mb-6 p-4 rounded-lg border bg-muted/30">
+              {/* Visual References — required, shown first */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Style Preset</label>
-                <select
-                  value={mockupStyle}
-                  onChange={(e) => setMockupStyle(e.target.value)}
-                  disabled={generatingPrompt}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="Modern Minimal">Modern Minimal</option>
-                  <option value="Bold & Dark">Bold & Dark</option>
-                  <option value="Playful & Colorful">Playful & Colorful</option>
-                  <option value="Corporate Clean">Corporate Clean</option>
-                  <option value="Luxury & Elegant">Luxury & Elegant</option>
-                  <option value="Retrowave">Retrowave</option>
-                  <option value="Futuristic">Futuristic</option>
-                </select>
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4" />
+                  Visual References
+                  <span className="text-destructive">*</span>
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Upload at least one image as a visual style reference. Click the star to mark one as the primary — Gemini will match its colors, fonts, and layout above all others.
+                </p>
+                {mockupRefImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {mockupRefImages.map((img, i) => (
+                      <div key={i} className={`relative group/thumb ${primaryRefIndex === i ? "ring-2 ring-yellow-400 rounded-md" : ""}`}>
+                        <img
+                          src={img}
+                          alt={`Reference ${i + 1}`}
+                          className="rounded-md border h-20 w-20 object-cover"
+                        />
+                        {/* Star button — toggle primary */}
+                        <button
+                          type="button"
+                          className="absolute top-0.5 left-0.5 h-5 w-5 flex items-center justify-center rounded-full bg-background/80 hover:bg-background transition-colors"
+                          title={primaryRefIndex === i ? "Remove as primary" : "Set as primary reference"}
+                          onClick={() =>
+                            setPrimaryRefIndex((prev) => (prev === i ? null : i))
+                          }
+                        >
+                          <Star className={`h-3.5 w-3.5 ${primaryRefIndex === i ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
+                        </button>
+                        {/* Remove button */}
+                        <button
+                          type="button"
+                          className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center text-xs opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                          onClick={() => {
+                            setMockupRefImages((prev) => prev.filter((_, j) => j !== i));
+                            setPrimaryRefIndex((prev) => {
+                              if (prev === null) return null;
+                              if (prev === i) return null;
+                              if (i < prev) return prev - 1;
+                              return prev;
+                            });
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm cursor-pointer hover:bg-muted/50 transition-colors w-fit ${mockupFormTouched && mockupRefImages.length === 0 ? "border-destructive" : ""}`}>
+                  <Upload className="h-4 w-4 text-muted-foreground" />
+                  <span>Upload images</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    disabled={generatingPrompt}
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      files.forEach((file) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setMockupRefImages((prev) => {
+                            const next = [...prev, reader.result as string];
+                            if (prev.length === 0) {
+                              setPrimaryRefIndex(0);
+                            }
+                            return next;
+                          });
+                        };
+                        reader.readAsDataURL(file);
+                      });
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {mockupFormTouched && mockupRefImages.length === 0 && (
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    At least one visual reference image is required
+                  </p>
+                )}
+                {mockupRefImages.length > 0 && primaryRefIndex === null && (
+                  <p className="text-xs text-amber-500 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Tip: Click the star on an image to set it as the primary reference for best results
+                  </p>
+                )}
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Page Type</label>
-                <select
-                  value={mockupPageType}
-                  onChange={(e) => setMockupPageType(e.target.value)}
-                  disabled={generatingPrompt}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="Homepage">Homepage</option>
-                  <option value="Product Page">Product Page</option>
-                  <option value="Collection Page">Collection Page</option>
-                  <option value="About Page">About Page</option>
-                  <option value="Contact Page">Contact Page</option>
-                  <option value="Blog Page">Blog Page</option>
-                </select>
+
+              <Separator />
+
+              {/* Style & Page Type — required, side by side */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    Style Preset <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={mockupStyle}
+                    onChange={(e) => setMockupStyle(e.target.value)}
+                    disabled={generatingPrompt}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="Modern Minimal">Modern Minimal</option>
+                    <option value="Bold & Dark">Bold & Dark</option>
+                    <option value="Playful & Colorful">Playful & Colorful</option>
+                    <option value="Corporate Clean">Corporate Clean</option>
+                    <option value="Luxury & Elegant">Luxury & Elegant</option>
+                    <option value="Retrowave">Retrowave</option>
+                    <option value="Futuristic">Futuristic</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    Page Type <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={mockupPageType}
+                    onChange={(e) => setMockupPageType(e.target.value)}
+                    disabled={generatingPrompt}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="Homepage">Homepage</option>
+                    <option value="Product Page">Product Page</option>
+                    <option value="Collection Page">Collection Page</option>
+                    <option value="About Page">About Page</option>
+                    <option value="Contact Page">Contact Page</option>
+                    <option value="Blog Page">Blog Page</option>
+                  </select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Custom Instructions (optional)</label>
+
+              {/* Custom Instructions — optional */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-muted-foreground">
+                  Custom Instructions <span className="text-xs font-normal">(optional)</span>
+                </label>
                 <Textarea
                   placeholder="e.g. Use a hero section with a large product image, include a trust badges section..."
                   value={mockupCustomPrompt}
@@ -2684,9 +2925,13 @@ export default function ProjectDetailPage({
                   disabled={generatingPrompt}
                 />
               </div>
+
+              {/* Products — optional */}
               {products.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Include Products (optional)</label>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Include Products <span className="text-xs font-normal">(optional)</span>
+                  </label>
                   <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-1">
                     {products.map((product) => (
                       <label
@@ -2711,9 +2956,16 @@ export default function ProjectDetailPage({
                   )}
                 </div>
               )}
-              <div className="flex gap-2">
+
+              <Separator />
+
+              <div className="flex items-center gap-2">
                 <Button
-                  onClick={handleGeneratePrompt}
+                  onClick={() => {
+                    setMockupFormTouched(true);
+                    if (mockupRefImages.length === 0) return;
+                    handleGeneratePrompt();
+                  }}
                   disabled={generatingPrompt}
                   size="sm"
                 >
@@ -2730,12 +2982,18 @@ export default function ProjectDetailPage({
                   onClick={() => {
                     setShowMockupForm(false);
                     setMockupCustomPrompt("");
+                    setMockupFormTouched(false);
+                    setMockupRefImages([]);
+                    setPrimaryRefIndex(null);
                   }}
                   disabled={generatingPrompt}
                 >
                   <X className="h-4 w-4 mr-2" />
                   Cancel
                 </Button>
+                {mockupFormTouched && mockupRefImages.length === 0 && (
+                  <p className="text-xs text-destructive">Fix errors above to continue</p>
+                )}
               </div>
             </div>
           )}
@@ -2881,59 +3139,32 @@ export default function ProjectDetailPage({
 
               <Separator />
 
-              {/* Visual References */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4" />
-                  Visual References (optional)
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  Upload images to send as visual style references alongside the prompt
-                </p>
-                {mockupRefImages.length > 0 && (
+              {/* Visual References summary (uploaded in step 1) */}
+              {mockupRefImages.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    Visual References ({mockupRefImages.length})
+                  </label>
                   <div className="flex flex-wrap gap-2">
                     {mockupRefImages.map((img, i) => (
-                      <div key={i} className="relative group/thumb">
+                      <div key={i} className={`relative ${primaryRefIndex === i ? "ring-2 ring-yellow-400 rounded-md" : ""}`}>
                         <img
                           src={img}
                           alt={`Reference ${i + 1}`}
-                          className="rounded-md border h-20 w-20 object-cover"
+                          className="rounded-md border h-16 w-16 object-cover"
                         />
-                        <button
-                          type="button"
-                          className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center text-xs opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                          onClick={() =>
-                            setMockupRefImages((prev) => prev.filter((_, j) => j !== i))
-                          }
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
+                        {primaryRefIndex === i && (
+                          <Star className="absolute top-0.5 left-0.5 h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                        )}
                       </div>
                     ))}
                   </div>
-                )}
-                <label className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm cursor-pointer hover:bg-muted/50 transition-colors w-fit">
-                  <Upload className="h-4 w-4 text-muted-foreground" />
-                  <span>Upload images</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files || []);
-                      files.forEach((file) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setMockupRefImages((prev) => [...prev, reader.result as string]);
-                        };
-                        reader.readAsDataURL(file);
-                      });
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-              </div>
+                  <p className="text-xs text-muted-foreground">
+                    {primaryRefIndex !== null ? "Primary reference marked — Gemini will prioritize it." : "No primary selected."} These images will be sent alongside the prompt.
+                  </p>
+                </div>
+              )}
 
               {/* Style References (text) */}
               <div className="space-y-2">
@@ -2983,6 +3214,8 @@ export default function ProjectDetailPage({
                     setGeneratedPrompt("");
                     setEditedPrompt("");
                     setMockupRefImages([]);
+                    setPrimaryRefIndex(null);
+                    setMockupFormTouched(false);
                     setMockupStyleRef("");
                     setShowMockupForm(true);
                   }}

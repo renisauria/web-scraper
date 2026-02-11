@@ -474,24 +474,24 @@ export async function generateMockupPrompt(
   },
   analyses: { type: string; content: Record<string, unknown> | null }[],
   competitors: { name: string; url: string; type?: string; preferredFeature?: string | null; notes?: string | null; screenshotLabel?: string | null; screenshot?: string | null; referenceImages?: { url: string; tag: "emulate" | "avoid" | null }[] | null }[],
-  options: { style: string; pageType: string; customInstructions?: string; designTokensContext?: string; productContext?: string }
+  options: { style: string; pageType: string; customInstructions?: string; designTokensContext?: string; productContext?: string; hasPrimaryReference?: boolean; referenceImageCount?: number }
 ): Promise<{ prompt: string }> {
   const systemPrompt = `You are an elite prompt engineer specializing in crafting image-generation prompts for AI models like Google Gemini Imagen. Your job is to take project context and produce a single, hyper-detailed image prompt that will generate a stunning, realistic website mockup screenshot.
 
 RULES FOR THE PROMPT YOU WRITE:
-1. USE CONCRETE VISUAL LANGUAGE ONLY — never say "professional feel" or "modern look". Instead say "navy blue navigation bar with white 14px sans-serif text, left-aligned logo, right-aligned menu links spaced 32px apart".
+1. USE CONCRETE VISUAL LANGUAGE ONLY — never say "professional feel" or "modern look". Instead say "navigation bar with left-aligned logo, right-aligned menu links spaced 32px apart" and describe structural details.
 2. SPECIFY EXACT LAYOUT — describe sections top-to-bottom: navigation, hero, features grid, testimonials, CTA banner, footer. State grid structures (e.g. "3-column card grid with 24px gaps").
-3. INCLUDE COLOR PALETTE — use hex codes. E.g. "primary: #1a1a2e, accent: #e94560, background: #f5f5f5, text: #333333".
-4. DESCRIBE TYPOGRAPHY — mention weight (bold, semibold, regular), style (sans-serif, serif), and relative sizes (e.g. "hero headline 48px bold sans-serif, subheadline 20px regular").
-5. NAME SPECIFIC UI COMPONENTS — hero section, sticky navbar, product cards, testimonial carousel, CTA buttons with rounded corners, icon grid, trust badges, newsletter signup, multi-column footer with social icons.
-6. SPECIFY FRAMING — "Desktop browser screenshot at 1440px width, shown in a clean browser chrome frame" or "Full-page website screenshot without browser chrome".
-7. INCLUDE NEGATIVE GUIDANCE — "Not a wireframe. Not a low-fidelity sketch. No lorem ipsum placeholder text — use realistic English copy. No watermarks. No UI kit component sheets."
-8. ANCHOR QUALITY — "Awwwards-quality design. Behance featured project level. Pixel-perfect rendering."
-9. INCLUDE REALISTIC CONTENT — suggest actual headline text, button labels, and section copy that match the brand.
-10. USE PROVIDED DESIGN TOKENS — if design tokens are provided, use the exact hex codes, font names, and spacing values from those tokens. Do not invent new colors or fonts when tokens are available.
-11. USE REAL PRODUCT DATA — if product data is provided, use exact product names, prices, descriptions, and variant info. Show real product cards with real names and prices, not placeholder text.
-12. USE COMPETITOR GUIDANCE — if competitors are labeled as POSITIVE INSPIRATION, emulate their design patterns and visual strengths. If competitors are labeled as NEGATIVE EXAMPLES, explicitly avoid their design patterns and shortcomings.
-13. REFERENCE ATTACHED SCREENSHOTS — if competitors have attached reference screenshots, your prompt MUST explicitly reference them using their individual tags. Screenshots tagged "emulate" mean: copy and draw from their design patterns, layout, colors, and visual style. Screenshots tagged "avoid" mean: do NOT replicate those layouts, styles, or patterns — design away from them. For each competitor with attached images, write specific instructions like "Draw from the attached 'emulate' reference from [Competitor Name] for layout and color cues" or "The attached 'avoid' reference from [Competitor Name] shows patterns to steer away from". Be specific about what visual elements to use or reject. The image-generation model will receive these screenshots alongside your prompt.
+3. DO NOT SPECIFY COLORS, HEX CODES, FONTS, OR TYPOGRAPHY — the image generation model will derive all colors, fonts, and typography from the provided visual reference screenshots. Never include hex codes, font names, or font sizes in the prompt.
+4. NAME SPECIFIC UI COMPONENTS — hero section, sticky navbar, product cards, testimonial carousel, CTA buttons with rounded corners, icon grid, trust badges, newsletter signup, multi-column footer with social icons.
+5. SPECIFY FRAMING — "Desktop browser screenshot at 1440px width, shown in a clean browser chrome frame" or "Full-page website screenshot without browser chrome".
+6. INCLUDE NEGATIVE GUIDANCE — "Not a wireframe. Not a low-fidelity sketch. No lorem ipsum placeholder text — use realistic English copy. No watermarks. No UI kit component sheets."
+7. ANCHOR QUALITY — "Awwwards-quality design. Behance featured project level. Pixel-perfect rendering."
+8. INCLUDE REALISTIC CONTENT — suggest actual headline text, button labels, and section copy that match the brand.
+9. USE PROVIDED DESIGN TOKENS — ONLY if design tokens are explicitly provided, use their exact hex codes, font names, and spacing values. If no tokens are provided, do NOT invent colors or fonts — defer entirely to the visual reference screenshots.
+10. USE REAL PRODUCT DATA — if product data is provided, use exact product names, prices, descriptions, and variant info. Show real product cards with real names and prices, not placeholder text.
+11. USE COMPETITOR GUIDANCE — if competitors are labeled as POSITIVE INSPIRATION, emulate their design patterns and visual strengths. If competitors are labeled as NEGATIVE EXAMPLES, explicitly avoid their design patterns and shortcomings.
+12. REFERENCE ATTACHED SCREENSHOTS — if competitors have attached reference screenshots, your prompt MUST explicitly reference them using their individual tags. Screenshots tagged "emulate" mean: copy and draw from their design patterns, layout, and visual style. Screenshots tagged "avoid" mean: do NOT replicate those layouts, styles, or patterns — design away from them. For each competitor with attached images, write specific instructions like "Draw from the attached 'emulate' reference from [Competitor Name] for layout cues" or "The attached 'avoid' reference from [Competitor Name] shows patterns to steer away from". Be specific about what visual elements to use or reject. The image-generation model will receive these screenshots alongside your prompt.
+13. PRIMARY VISUAL REFERENCE — if a PRIMARY REFERENCE image is mentioned, instruct the image model to treat it as the dominant visual influence. The mockup should closely match its layout, color palette, typography, and overall aesthetic above all other references.
 
 Return ONLY the complete image-generation prompt as plain text (no JSON wrapper, no markdown, no explanation). The prompt should be 400-800 words.`;
 
@@ -575,6 +575,15 @@ Return ONLY the complete image-generation prompt as plain text (no JSON wrapper,
 
   if (options.productContext) {
     contextParts.push(options.productContext);
+  }
+
+  // Inform the prompt about visual references that will be attached to the image model
+  if (options.referenceImageCount && options.referenceImageCount > 0) {
+    if (options.hasPrimaryReference) {
+      contextParts.push(`VISUAL REFERENCES: ${options.referenceImageCount} user-uploaded reference image(s) will be attached to the image generation model. One is marked as the PRIMARY REFERENCE — the image model will receive it first with instructions to closely match its layout, color palette, and typography. Your prompt should NOT specify colors, hex codes, or font names — instead, instruct the image model to derive all visual styling from the primary reference screenshot.`);
+    } else {
+      contextParts.push(`VISUAL REFERENCES: ${options.referenceImageCount} user-uploaded reference image(s) will be attached to the image generation model. Your prompt should NOT specify colors, hex codes, or font names — instead, instruct the image model to derive visual styling from the attached reference screenshots.`);
+    }
   }
 
   if (options.customInstructions) {

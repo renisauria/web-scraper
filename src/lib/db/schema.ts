@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import type { PlatformInfo } from "@/lib/platform-detector";
 
 export const projects = sqliteTable("projects", {
   id: text("id").primaryKey(),
@@ -15,6 +16,7 @@ export const projects = sqliteTable("projects", {
   })
     .notNull()
     .default("pending"),
+  platformInfo: text("platform_info", { mode: "json" }).$type<PlatformInfo>(),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -22,6 +24,8 @@ export const projects = sqliteTable("projects", {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+export type { PlatformInfo } from "@/lib/platform-detector";
 
 export const pages = sqliteTable("pages", {
   id: text("id").primaryKey(),

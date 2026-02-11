@@ -1,3 +1,6 @@
+export type { PlatformInfo, ShopifyTemplate } from "@/lib/platform-detector";
+import type { PlatformInfo } from "@/lib/platform-detector";
+
 export type ProjectStatus =
   | "pending"
   | "scraping"
@@ -23,6 +26,7 @@ export interface Project {
   projectRequirements: string | null;
   clientNotes: string | null;
   crawlJobId: string | null;
+  platformInfo: PlatformInfo | null;
   status: ProjectStatus;
   createdAt: Date;
   updatedAt: Date;

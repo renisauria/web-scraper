@@ -131,14 +131,26 @@ async function resolveImageToBase64(
 export async function generateMockup(
   prompt: string,
   referenceImages?: string[],
-  negativeReferenceImages?: string[]
+  negativeReferenceImages?: string[],
+  primaryReferenceImage?: string
 ): Promise<{ image: string; text: string }> {
   const contents: Array<
     | { text: string }
     | { inlineData: { mimeType: string; data: string } }
   > = [];
 
-  // Add positive reference images
+  // 1. PRIMARY REFERENCE — dominant visual influence, sent first
+  if (primaryReferenceImage) {
+    const resolved = await resolveImageToBase64(primaryReferenceImage);
+    if (resolved) {
+      contents.push({
+        text: "PRIMARY REFERENCE — this is the #1 most important visual reference. Match this design's exact layout, color palette, typography, and overall aesthetic as closely as possible:",
+      });
+      contents.push({ inlineData: resolved });
+    }
+  }
+
+  // 2. SUPPORTING reference images
   if (referenceImages && referenceImages.length > 0) {
     const resolved = await Promise.all(
       referenceImages.slice(0, 5).map(resolveImageToBase64)
@@ -146,7 +158,7 @@ export async function generateMockup(
     const valid = resolved.filter(Boolean) as { mimeType: string; data: string }[];
     if (valid.length > 0) {
       contents.push({
-        text: "POSITIVE reference images — emulate these design patterns for the mockup:",
+        text: "SUPPORTING reference images — use these as additional design inspiration, but the PRIMARY REFERENCE above takes priority:",
       });
       for (const imgData of valid) {
         contents.push({ inlineData: imgData });
@@ -154,7 +166,7 @@ export async function generateMockup(
     }
   }
 
-  // Add negative reference images
+  // 3. NEGATIVE reference images
   if (negativeReferenceImages && negativeReferenceImages.length > 0) {
     const resolved = await Promise.all(
       negativeReferenceImages.slice(0, 3).map(resolveImageToBase64)
@@ -170,10 +182,11 @@ export async function generateMockup(
     }
   }
 
+  // 4. Text prompt last
   contents.push({ text: prompt });
 
   const response = await ai.models.generateContent({
-    model: "nano-banana-pro-preview",
+    model: "gemini-3-pro-image-preview",
     contents: [{ role: "user", parts: contents }],
     config: {
       responseModalities: ["TEXT", "IMAGE"],

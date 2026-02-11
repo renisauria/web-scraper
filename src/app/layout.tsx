@@ -10,6 +10,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Website Analyzer - Marketing Strategy Tool",
   description: "Analyze websites for marketing strategy, tech stack, and architecture",
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

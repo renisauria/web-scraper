@@ -16,6 +16,7 @@ const generateSchema = z.object({
   label: z.string().optional(),
   style: z.string().optional(),
   extraReferenceImages: z.array(z.string()).optional(),
+  primaryReferenceImageIndex: z.number().int().min(0).optional(),
   originalPrompt: z.string().optional(),
   customInstructions: z.string().optional(),
   styleRef: z.string().optional(),
@@ -24,7 +25,7 @@ const generateSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, prompt, label, style, extraReferenceImages, originalPrompt, customInstructions, styleRef } = generateSchema.parse(body);
+    const { projectId, prompt, label, style, extraReferenceImages, primaryReferenceImageIndex, originalPrompt, customInstructions, styleRef } = generateSchema.parse(body);
 
     // Verify project exists
     const projectRows = await db
@@ -46,8 +47,18 @@ export async function POST(request: NextRequest) {
     const goodReferenceImages: string[] = [];
     const badReferenceImages: string[] = [];
 
-    // Add user-uploaded visual references as positive (highest priority)
-    if (extraReferenceImages) {
+    // Extract primary reference image from user uploads (if specified)
+    let primaryImage: string | undefined;
+    if (extraReferenceImages && primaryReferenceImageIndex !== undefined && primaryReferenceImageIndex < extraReferenceImages.length) {
+      primaryImage = extraReferenceImages[primaryReferenceImageIndex];
+      // Add remaining user uploads (excluding primary) as positive references
+      for (let i = 0; i < extraReferenceImages.length; i++) {
+        if (i !== primaryReferenceImageIndex) {
+          goodReferenceImages.push(extraReferenceImages[i]);
+        }
+      }
+    } else if (extraReferenceImages) {
+      // No primary selected — all user uploads go into positive references
       goodReferenceImages.push(...extraReferenceImages);
     }
 
@@ -79,7 +90,8 @@ export async function POST(request: NextRequest) {
     const result = await generateMockup(
       prompt,
       goodReferenceImages.length > 0 ? goodReferenceImages.slice(0, 5) : undefined,
-      badReferenceImages.length > 0 ? badReferenceImages.slice(0, 3) : undefined
+      badReferenceImages.length > 0 ? badReferenceImages.slice(0, 3) : undefined,
+      primaryImage
     );
 
     // Save to DB

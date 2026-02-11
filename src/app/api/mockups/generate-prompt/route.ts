@@ -15,12 +15,14 @@ const generatePromptSchema = z.object({
   pageType: z.string().min(1),
   customInstructions: z.string().optional(),
   selectedProductIds: z.array(z.string()).optional(),
+  hasPrimaryReference: z.boolean().optional(),
+  referenceImageCount: z.number().int().min(0).optional(),
 });
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, style, pageType, customInstructions, selectedProductIds } =
+    const { projectId, style, pageType, customInstructions, selectedProductIds, hasPrimaryReference, referenceImageCount } =
       generatePromptSchema.parse(body);
 
     // Fetch project
@@ -98,6 +100,8 @@ export async function POST(request: NextRequest) {
       customInstructions: customInstructions || undefined,
       designTokensContext,
       productContext,
+      hasPrimaryReference,
+      referenceImageCount,
     });
 
     return NextResponse.json({ prompt: result.prompt });
