@@ -38,7 +38,8 @@ export function MarkdownEditor({
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
       if (isUpdatingRef.current) return;
-      const md = editor.storage.markdown.getMarkdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const md = (editor.storage as Record<string, any>).markdown.getMarkdown();
       onChange(md);
     },
     editorProps: {
@@ -51,7 +52,8 @@ export function MarkdownEditor({
 
   useEffect(() => {
     if (!editor) return;
-    const currentMd = editor.storage.markdown.getMarkdown();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const currentMd = (editor.storage as Record<string, any>).markdown.getMarkdown();
     if (currentMd !== value) {
       isUpdatingRef.current = true;
       editor.commands.setContent(value);
