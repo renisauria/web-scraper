@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { captureViewportScreenshot } from "@/lib/firecrawl";
+import { compressScreenshot } from "@/lib/screenshot-compress";
 import { logError } from "@/lib/error-logger";
 
 const updateCompetitorSchema = z.object({
@@ -102,7 +103,8 @@ export async function POST(
     }
 
     const competitor = existing[0];
-    const screenshot = await captureViewportScreenshot(competitor.url);
+    const rawScreenshot = await captureViewportScreenshot(competitor.url);
+    const screenshot = await compressScreenshot(rawScreenshot);
 
     await db
       .update(schema.competitors)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { captureFullPageScreenshot } from "@/lib/firecrawl";
+import { compressScreenshot } from "@/lib/screenshot-compress";
 import { logError } from "@/lib/error-logger";
 
 // Capture a full-page screenshot for the page
@@ -35,17 +36,19 @@ export async function POST(
       );
     }
 
-    // Update the page with the full-page screenshot
+    // Compress and update the page with the full-page screenshot
+    const compressedScreenshot = await compressScreenshot(screenshot);
+
     await db
       .update(schema.pages)
       .set({
-        fullPageScreenshot: screenshot,
+        fullPageScreenshot: compressedScreenshot,
       })
       .where(eq(schema.pages.id, pageId));
 
     return NextResponse.json({
       success: true,
-      fullPageScreenshot: screenshot,
+      fullPageScreenshot: compressedScreenshot,
     });
   } catch (error) {
     await logError({ route: "/api/pages/[pageId]/screenshot", method: "POST", error });

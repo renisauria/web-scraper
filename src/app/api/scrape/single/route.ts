@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { scrapeSinglePage } from "@/lib/firecrawl";
+import { compressScreenshot } from "@/lib/screenshot-compress";
 import { z } from "zod";
 import { logError } from "@/lib/error-logger";
 
@@ -56,6 +57,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Compress screenshot to WebP
+    const compressedScreenshot = await compressScreenshot(scrapedPage.screenshot || null);
+
     // Save to database
     const pageRecord = {
       id: uuidv4(),
@@ -63,7 +67,7 @@ export async function POST(request: NextRequest) {
       url: scrapedPage.url || url,
       title: scrapedPage.title || null,
       content: scrapedPage.markdown || scrapedPage.content || null,
-      screenshot: scrapedPage.screenshot || null,
+      screenshot: compressedScreenshot,
       metadata: scrapedPage.metadata || null,
       version: 1,
       createdAt: new Date(),

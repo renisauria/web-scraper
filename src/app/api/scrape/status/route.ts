@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { getCrawlStatus } from "@/lib/firecrawl";
 import { detectPlatform } from "@/lib/platform-detector";
+import { compressScreenshots } from "@/lib/screenshot-compress";
 import { logError } from "@/lib/error-logger";
 
 export async function GET(request: NextRequest) {
@@ -66,13 +67,17 @@ export async function GET(request: NextRequest) {
 
     // If crawl is complete, save pages and update project
     if (crawlStatus.status === "completed" && crawlStatus.pages) {
-      const pageRecords = crawlStatus.pages.map((page) => ({
+      // Batch-compress all screenshots to WebP
+      const rawScreenshots = crawlStatus.pages.map((p) => p.screenshot || null);
+      const compressed = await compressScreenshots(rawScreenshots);
+
+      const pageRecords = crawlStatus.pages.map((page, i) => ({
         id: uuidv4(),
         projectId,
         url: page.url,
         title: page.title || null,
         content: page.markdown || page.content || null,
-        screenshot: page.screenshot || null,
+        screenshot: compressed[i],
         metadata: page.metadata || null,
         version: 1,
         createdAt: new Date(),

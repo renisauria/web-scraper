@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import { generateMockup } from "@/lib/gemini";
+import { compressScreenshot } from "@/lib/screenshot-compress";
 import { logError } from "@/lib/error-logger";
 import { normalizeReferenceImages } from "@/types";
 import type { Competitor } from "@/types";
@@ -94,13 +95,16 @@ export async function POST(request: NextRequest) {
       primaryImage
     );
 
+    // Compress mockup image to WebP
+    const compressedImage = (await compressScreenshot(result.image)) ?? result.image;
+
     // Save to DB
     const mockupId = uuidv4();
     await db.insert(schema.mockups).values({
       id: mockupId,
       projectId,
       prompt,
-      image: result.image,
+      image: compressedImage,
       label: label || null,
       style: style || null,
       originalPrompt: originalPrompt || null,

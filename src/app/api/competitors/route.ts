@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import { captureViewportScreenshot } from "@/lib/firecrawl";
+import { compressScreenshot } from "@/lib/screenshot-compress";
 import { logError } from "@/lib/error-logger";
 
 const createCompetitorSchema = z.object({
@@ -65,8 +66,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Capture viewport screenshot
-    const screenshot = await captureViewportScreenshot(url);
+    // Capture and compress viewport screenshot
+    const rawScreenshot = await captureViewportScreenshot(url);
+    const screenshot = await compressScreenshot(rawScreenshot);
 
     const id = uuidv4();
     await db.insert(schema.competitors).values({
