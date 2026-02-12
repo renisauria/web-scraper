@@ -474,7 +474,7 @@ export async function generateMockupPrompt(
   },
   analyses: { type: string; content: Record<string, unknown> | null }[],
   competitors: { name: string; url: string; type?: string; preferredFeature?: string | null; notes?: string | null; screenshotLabel?: string | null; screenshot?: string | null; referenceImages?: { url: string; tag: "emulate" | "avoid" | null }[] | null }[],
-  options: { style: string; pageType: string; customInstructions?: string; designTokensContext?: string; productContext?: string; hasPrimaryReference?: boolean; referenceImageCount?: number }
+  options: { style: string; pageType: string; aspectRatio?: string; customInstructions?: string; designTokensContext?: string; productContext?: string; hasPrimaryReference?: boolean; referenceImageCount?: number; hasLogo?: boolean; selectedProductImageCount?: number }
 ): Promise<{ prompt: string }> {
   const systemPrompt = `You are an elite prompt engineer specializing in crafting image-generation prompts for AI models like Google Gemini Imagen. Your job is to take project context and produce a single, hyper-detailed image prompt that will generate a stunning, realistic website mockup screenshot.
 
@@ -492,6 +492,8 @@ RULES FOR THE PROMPT YOU WRITE:
 11. USE COMPETITOR GUIDANCE — if competitors are labeled as POSITIVE INSPIRATION, emulate their design patterns and visual strengths. If competitors are labeled as NEGATIVE EXAMPLES, explicitly avoid their design patterns and shortcomings.
 12. REFERENCE ATTACHED SCREENSHOTS — if competitors have attached reference screenshots, your prompt MUST explicitly reference them using their individual tags. Screenshots tagged "emulate" mean: copy and draw from their design patterns, layout, and visual style. Screenshots tagged "avoid" mean: do NOT replicate those layouts, styles, or patterns — design away from them. For each competitor with attached images, write specific instructions like "Draw from the attached 'emulate' reference from [Competitor Name] for layout cues" or "The attached 'avoid' reference from [Competitor Name] shows patterns to steer away from". Be specific about what visual elements to use or reject. The image-generation model will receive these screenshots alongside your prompt.
 13. PRIMARY VISUAL REFERENCE — if a PRIMARY REFERENCE image is mentioned, instruct the image model to treat it as the dominant visual influence. The mockup should closely match its layout, color palette, typography, and overall aesthetic above all other references.
+14. BRAND LOGO — if a real brand logo is being attached, instruct the image model to place the exact logo in the header/navigation area. Do NOT describe a made-up logo or suggest generating one — the real logo image will be provided to the image model directly.
+15. PRODUCT PHOTOGRAPHS — if real product photos are being attached, instruct the image model to use them in product cards, hero sections, and product display areas. Do NOT describe placeholder product images — the real product photos will be provided to the image model directly.
 
 Return ONLY the complete image-generation prompt as plain text (no JSON wrapper, no markdown, no explanation). The prompt should be 400-800 words.`;
 
@@ -503,6 +505,18 @@ Return ONLY the complete image-generation prompt as plain text (no JSON wrapper,
   }
   contextParts.push(`Design Style: ${options.style}`);
   contextParts.push(`Page Type: ${options.pageType}`);
+  if (options.aspectRatio) {
+    const aspectDescriptions: Record<string, string> = {
+      "9:16": "tall vertical (9:16) — full-page scrolling website screenshot showing header through footer",
+      "3:4": "portrait (3:4) — above-the-fold view with some content below",
+      "2:3": "tall portrait (2:3) — extended view showing more page sections",
+      "1:1": "square (1:1) — focused view of the most important section",
+      "4:3": "landscape (4:3) — desktop viewport, above-the-fold focus",
+      "3:2": "wide (3:2) — widescreen desktop viewport",
+      "16:9": "widescreen (16:9) — cinematic desktop viewport, above-the-fold only",
+    };
+    contextParts.push(`Image Aspect Ratio: ${aspectDescriptions[options.aspectRatio] || options.aspectRatio}. Design the layout to fill this format naturally — adjust the number of sections and content density accordingly.`);
+  }
 
   if (project.clientProblems) {
     contextParts.push(
@@ -584,6 +598,14 @@ Return ONLY the complete image-generation prompt as plain text (no JSON wrapper,
     } else {
       contextParts.push(`VISUAL REFERENCES: ${options.referenceImageCount} user-uploaded reference image(s) will be attached to the image generation model. Your prompt should NOT specify colors, hex codes, or font names — instead, instruct the image model to derive visual styling from the attached reference screenshots.`);
     }
+  }
+
+  if (options.hasLogo) {
+    contextParts.push(`BRAND LOGO: The client's real brand logo will be attached to the image generation model. Instruct the model to place the exact logo in the header/navigation — do NOT describe a made-up logo.`);
+  }
+
+  if (options.selectedProductImageCount && options.selectedProductImageCount > 0) {
+    contextParts.push(`PRODUCT PHOTOGRAPHS: ${options.selectedProductImageCount} real product photo(s) will be attached to the image generation model. Instruct the model to use these exact photos in product display areas — do NOT describe placeholder product images.`);
   }
 
   if (options.customInstructions) {

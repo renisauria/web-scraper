@@ -18,6 +18,8 @@ const generateSchema = z.object({
   style: z.string().optional(),
   extraReferenceImages: z.array(z.string()).optional(),
   primaryReferenceImageIndex: z.number().int().min(0).optional(),
+  selectedProductImageUrls: z.array(z.string()).optional(),
+  aspectRatio: z.string().optional(),
   originalPrompt: z.string().optional(),
   customInstructions: z.string().optional(),
   styleRef: z.string().optional(),
@@ -26,7 +28,7 @@ const generateSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, prompt, label, style, extraReferenceImages, primaryReferenceImageIndex, originalPrompt, customInstructions, styleRef } = generateSchema.parse(body);
+    const { projectId, prompt, label, style, extraReferenceImages, primaryReferenceImageIndex, selectedProductImageUrls, aspectRatio, originalPrompt, customInstructions, styleRef } = generateSchema.parse(body);
 
     // Verify project exists
     const projectRows = await db
@@ -38,6 +40,8 @@ export async function POST(request: NextRequest) {
     if (projectRows.length === 0) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
+
+    const project = projectRows[0];
 
     // Collect reference images from competitors, grouped by tag
     const competitors = (await db
@@ -63,19 +67,8 @@ export async function POST(request: NextRequest) {
       goodReferenceImages.push(...extraReferenceImages);
     }
 
-    // Group competitor images: auto-captured screenshot uses competitor-level label,
-    // user-uploaded reference images use their individual per-image tags
+    // Only use user-uploaded reference images from competitors (not auto-captured screenshots)
     for (const comp of competitors) {
-      // Auto-captured screenshot uses competitor-level screenshotLabel
-      if (comp.screenshot) {
-        if (comp.screenshotLabel === "bad") {
-          badReferenceImages.push(comp.screenshot);
-        } else {
-          goodReferenceImages.push(comp.screenshot);
-        }
-      }
-
-      // Per-image tagged reference images
       const refImages = normalizeReferenceImages(comp.referenceImages);
       for (const img of refImages) {
         if (img.tag === "avoid") {
@@ -92,7 +85,10 @@ export async function POST(request: NextRequest) {
       prompt,
       goodReferenceImages.length > 0 ? goodReferenceImages.slice(0, 5) : undefined,
       badReferenceImages.length > 0 ? badReferenceImages.slice(0, 3) : undefined,
-      primaryImage
+      primaryImage,
+      project.logo || undefined,
+      selectedProductImageUrls,
+      aspectRatio,
     );
 
     // Compress mockup image to WebP

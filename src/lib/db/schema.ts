@@ -11,6 +11,7 @@ export const projects = sqliteTable("projects", {
   projectRequirements: text("project_requirements"),
   clientNotes: text("client_notes"),
   crawlJobId: text("crawl_job_id"),
+  logo: text("logo"),
   status: text("status", {
     enum: ["pending", "scraping", "scraped", "analyzing", "complete", "error"],
   })

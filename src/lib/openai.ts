@@ -221,7 +221,7 @@ export async function generateMockupPrompt(
   },
   analyses: { type: string; content: Record<string, unknown> | null }[],
   competitors: { name: string; url: string; type?: string; preferredFeature?: string | null; notes?: string | null; screenshotLabel?: string | null; screenshot?: string | null; referenceImages?: { url: string; tag: "emulate" | "avoid" | null }[] | null }[],
-  options: { style: string; pageType: string; customInstructions?: string; designTokensContext?: string; productContext?: string }
+  options: { style: string; pageType: string; aspectRatio?: string; customInstructions?: string; designTokensContext?: string; productContext?: string; hasLogo?: boolean; selectedProductImageCount?: number }
 ): Promise<{ prompt: string }> {
   const systemPrompt = `You are an elite prompt engineer specializing in crafting image-generation prompts for AI models like Google Gemini Imagen. Your job is to take project context and produce a single, hyper-detailed image prompt that will generate a stunning, realistic website mockup screenshot.
 

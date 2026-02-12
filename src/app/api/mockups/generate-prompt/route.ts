@@ -13,8 +13,11 @@ const generatePromptSchema = z.object({
   projectId: z.string().min(1),
   style: z.string().min(1),
   pageType: z.string().min(1),
+  aspectRatio: z.string().optional(),
   customInstructions: z.string().optional(),
   selectedProductIds: z.array(z.string()).optional(),
+  selectedProductImageCount: z.number().int().min(0).optional(),
+  hasLogo: z.boolean().optional(),
   hasPrimaryReference: z.boolean().optional(),
   referenceImageCount: z.number().int().min(0).optional(),
 });
@@ -22,7 +25,7 @@ const generatePromptSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, style, pageType, customInstructions, selectedProductIds, hasPrimaryReference, referenceImageCount } =
+    const { projectId, style, pageType, aspectRatio, customInstructions, selectedProductIds, selectedProductImageCount, hasPrimaryReference, referenceImageCount } =
       generatePromptSchema.parse(body);
 
     // Fetch project
@@ -97,11 +100,14 @@ export async function POST(request: NextRequest) {
     const result = await generateMockupPrompt(project, analyses, competitors, {
       style,
       pageType,
+      aspectRatio,
       customInstructions: customInstructions || undefined,
       designTokensContext,
       productContext,
       hasPrimaryReference,
       referenceImageCount,
+      hasLogo: !!project.logo,
+      selectedProductImageCount,
     });
 
     return NextResponse.json({ prompt: result.prompt });

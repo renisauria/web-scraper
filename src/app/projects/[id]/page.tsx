@@ -59,6 +59,8 @@ import {
   ThumbsDown,
   Star,
   Monitor,
+  Copy,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Project, Page, Analysis, Competitor, CompetitorType, ScreenshotLabel, Mockup, SavedPrompt, DesignKit, Product, ReferenceImage } from "@/types";
@@ -119,6 +121,7 @@ export default function ProjectDetailPage({
   const [showMockupForm, setShowMockupForm] = useState(false);
   const [mockupStyle, setMockupStyle] = useState("Modern Minimal");
   const [mockupPageType, setMockupPageType] = useState("Homepage");
+  const [mockupAspectRatio, setMockupAspectRatio] = useState("9:16");
   const [mockupCustomPrompt, setMockupCustomPrompt] = useState("");
   const [generatingPrompt, setGeneratingPrompt] = useState(false);
   const [generatingImage, setGeneratingImage] = useState(false);
@@ -146,6 +149,10 @@ export default function ProjectDetailPage({
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [detectingPlatform, setDetectingPlatform] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [selectedProductImageUrls, setSelectedProductImageUrls] = useState<string[]>([]);
 
   const fetchProject = useCallback(async () => {
     try {
@@ -491,8 +498,11 @@ export default function ProjectDetailPage({
           projectId: id,
           style: mockupStyle,
           pageType: mockupPageType,
+          aspectRatio: mockupAspectRatio,
           customInstructions: mockupCustomPrompt.trim() || undefined,
           selectedProductIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
+          hasLogo: !!data?.project.logo,
+          selectedProductImageCount: selectedProductImageUrls.length,
           hasPrimaryReference: primaryRefIndex !== null,
           referenceImageCount: mockupRefImages.length,
         }),
@@ -538,6 +548,8 @@ export default function ProjectDetailPage({
           style: mockupStyle,
           extraReferenceImages: mockupRefImages.length > 0 ? mockupRefImages : undefined,
           primaryReferenceImageIndex: mockupRefImages.length > 0 && primaryRefIndex !== null ? primaryRefIndex : undefined,
+          selectedProductImageUrls: selectedProductImageUrls.length > 0 ? selectedProductImageUrls : undefined,
+          aspectRatio: mockupAspectRatio,
           originalPrompt: generatedPrompt || undefined,
           customInstructions: mockupCustomPrompt.trim() || undefined,
           styleRef: mockupStyleRef.trim() || undefined,
@@ -557,6 +569,7 @@ export default function ProjectDetailPage({
       setPrimaryRefIndex(null);
       setMockupFormTouched(false);
       setMockupStyleRef("");
+      setSelectedProductImageUrls([]);
       await fetchProject();
       toast.success("Mockup generated!");
     } catch (err) {
@@ -639,12 +652,91 @@ export default function ProjectDetailPage({
     }
   }
 
+  async function handleCopy(text: string, field: string) {
+    await navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    toast.success("Copied to clipboard");
+    setTimeout(() => setCopiedField(null), 2000);
+  }
+
+  async function handleDetectPlatform() {
+    setDetectingPlatform(true);
+    try {
+      const response = await fetch(`/api/projects/${id}/detect-platform`, {
+        method: "POST",
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to detect platform");
+      }
+      toast.success(
+        result.platformInfo.platform !== "unknown"
+          ? `Detected platform: ${result.platformInfo.platform}`
+          : "Could not determine platform"
+      );
+      await fetchProject();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to detect platform";
+      toast.error(msg);
+    } finally {
+      setDetectingPlatform(false);
+    }
+  }
+
   function toggleProductSelection(productId: string) {
     setSelectedProductIds((prev) =>
       prev.includes(productId)
         ? prev.filter((id) => id !== productId)
         : [...prev, productId]
     );
+  }
+
+  function toggleProductImageUrl(url: string) {
+    setSelectedProductImageUrls((prev) =>
+      prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url]
+    );
+  }
+
+  async function handleLogoUpload(file: File) {
+    setUploadingLogo(true);
+    try {
+      const reader = new FileReader();
+      const dataUri = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const response = await fetch(`/api/projects/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logo: dataUri }),
+      });
+
+      if (!response.ok) throw new Error("Failed to upload logo");
+      await fetchProject();
+      toast.success("Logo uploaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to upload logo");
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
+  async function handleLogoRemove() {
+    try {
+      const response = await fetch(`/api/projects/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logo: null }),
+      });
+
+      if (!response.ok) throw new Error("Failed to remove logo");
+      await fetchProject();
+      toast.success("Logo removed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove logo");
+    }
   }
 
   async function handleSavePrompt() {
@@ -1276,6 +1368,61 @@ export default function ProjectDetailPage({
               <p className="text-muted-foreground">{project.clientName}</p>
             )}
           </div>
+
+          {/* Logo upload/preview */}
+          <div className="ml-4">
+            {project.logo ? (
+              <div className="group relative">
+                <img
+                  src={project.logo}
+                  alt="Brand logo"
+                  className="h-10 w-auto max-w-[120px] object-contain rounded border bg-white p-1"
+                />
+                <div className="absolute inset-0 bg-black/60 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                  <label className="cursor-pointer p-1 hover:bg-white/20 rounded" title="Replace logo">
+                    <RefreshCw className="h-3.5 w-3.5 text-white" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleLogoUpload(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <button
+                    onClick={handleLogoRemove}
+                    className="p-1 hover:bg-white/20 rounded"
+                    title="Remove logo"
+                  >
+                    <X className="h-3.5 w-3.5 text-white" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-dashed border-muted-foreground/40 hover:border-muted-foreground/70 hover:bg-muted/50 transition-colors text-xs text-muted-foreground">
+                {uploadingLogo ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Upload className="h-3.5 w-3.5" />
+                )}
+                {uploadingLogo ? "Uploading..." : "Logo"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingLogo}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleLogoUpload(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {hasScrapedData && (
@@ -1517,7 +1664,42 @@ export default function ProjectDetailPage({
       </div>
 
       {/* Platform Detection */}
-      {project.platformInfo && (
+      {!project.platformInfo ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Monitor className="h-5 w-5" />
+                  Platform Detection
+                </CardTitle>
+                <CardDescription>
+                  Detect the platform used by this website
+                </CardDescription>
+              </div>
+              <Button
+                size="sm"
+                onClick={handleDetectPlatform}
+                disabled={!hasScrapedData || detectingPlatform}
+              >
+                {detectingPlatform ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Monitor className="h-4 w-4 mr-2" />
+                )}
+                Detect Platform
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              {hasScrapedData
+                ? "Click to analyze scraped pages and detect the website platform."
+                : "Scrape pages first to enable platform detection."}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -1540,6 +1722,20 @@ export default function ProjectDetailPage({
                 <Badge variant="outline" className="capitalize">
                   {project.platformInfo.platform}
                 </Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleDetectPlatform}
+                  disabled={detectingPlatform}
+                  title="Re-detect platform"
+                >
+                  {detectingPlatform ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -2871,8 +3067,8 @@ export default function ProjectDetailPage({
 
               <Separator />
 
-              {/* Style & Page Type — required, side by side */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Style, Page Type & Aspect Ratio — required */}
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">
                     Style Preset <span className="text-destructive">*</span>
@@ -2910,6 +3106,25 @@ export default function ProjectDetailPage({
                     <option value="Blog Page">Blog Page</option>
                   </select>
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    Aspect Ratio
+                  </label>
+                  <select
+                    value={mockupAspectRatio}
+                    onChange={(e) => setMockupAspectRatio(e.target.value)}
+                    disabled={generatingPrompt}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="9:16">9:16 Full Page</option>
+                    <option value="3:4">3:4 Portrait</option>
+                    <option value="2:3">2:3 Tall Portrait</option>
+                    <option value="1:1">1:1 Square</option>
+                    <option value="4:3">4:3 Landscape</option>
+                    <option value="3:2">3:2 Wide</option>
+                    <option value="16:9">16:9 Widescreen</option>
+                  </select>
+                </div>
               </div>
 
               {/* Custom Instructions — optional */}
@@ -2932,26 +3147,60 @@ export default function ProjectDetailPage({
                   <label className="text-sm font-medium text-muted-foreground">
                     Include Products <span className="text-xs font-normal">(optional)</span>
                   </label>
-                  <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-1">
+                  <div className="max-h-60 overflow-y-auto rounded-md border p-2 space-y-1">
                     {products.map((product) => (
-                      <label
-                        key={product.id}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 cursor-pointer text-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedProductIds.includes(product.id)}
-                          onChange={() => toggleProductSelection(product.id)}
-                          disabled={generatingPrompt}
-                          className="rounded border-input"
-                        />
-                        <span className="truncate flex-1">{product.name}</span>
-                      </label>
+                      <div key={product.id}>
+                        <label
+                          className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 cursor-pointer text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedProductIds.includes(product.id)}
+                            onChange={() => toggleProductSelection(product.id)}
+                            disabled={generatingPrompt}
+                            className="rounded border-input"
+                          />
+                          <span className="truncate flex-1">{product.name}</span>
+                          {product.images && product.images.length > 0 && (
+                            <span className="text-[10px] text-muted-foreground">{product.images.length} img</span>
+                          )}
+                        </label>
+                        {/* Show product image thumbnails when selected */}
+                        {selectedProductIds.includes(product.id) && product.images && product.images.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pl-8 pb-2 pt-1">
+                            {product.images.map((imgUrl, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => toggleProductImageUrl(imgUrl)}
+                                className={`relative rounded border overflow-hidden h-12 w-12 flex-shrink-0 transition-all ${
+                                  selectedProductImageUrls.includes(imgUrl)
+                                    ? "ring-2 ring-primary border-primary"
+                                    : "opacity-60 hover:opacity-100"
+                                }`}
+                                title={selectedProductImageUrls.includes(imgUrl) ? "Remove from mockup" : "Include in mockup"}
+                              >
+                                <img
+                                  src={imgUrl}
+                                  alt={`${product.name} image ${idx + 1}`}
+                                  className="h-full w-full object-cover"
+                                />
+                                {selectedProductImageUrls.includes(imgUrl) && (
+                                  <div className="absolute top-0 right-0 bg-primary rounded-bl p-0.5">
+                                    <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
-                  {selectedProductIds.length > 0 && (
+                  {(selectedProductIds.length > 0 || selectedProductImageUrls.length > 0) && (
                     <p className="text-xs text-muted-foreground">
-                      {selectedProductIds.length} product{selectedProductIds.length !== 1 ? "s" : ""} selected — real data will be injected into the prompt
+                      {selectedProductIds.length} product{selectedProductIds.length !== 1 ? "s" : ""} selected
+                      {selectedProductImageUrls.length > 0 && ` + ${selectedProductImageUrls.length} product image${selectedProductImageUrls.length !== 1 ? "s" : ""} for mockup`}
                     </p>
                   )}
                 </div>
@@ -2985,6 +3234,7 @@ export default function ProjectDetailPage({
                     setMockupFormTouched(false);
                     setMockupRefImages([]);
                     setPrimaryRefIndex(null);
+                    setSelectedProductImageUrls([]);
                   }}
                   disabled={generatingPrompt}
                 >
@@ -3009,6 +3259,9 @@ export default function ProjectDetailPage({
                   </Badge>
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                     {mockupStyle}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    {mockupAspectRatio}
                   </Badge>
                 </div>
               </div>
@@ -3166,6 +3419,45 @@ export default function ProjectDetailPage({
                 </div>
               )}
 
+              {/* Logo & Product Images summary */}
+              {(data?.project.logo || selectedProductImageUrls.length > 0) && (
+                <div className="space-y-2">
+                  {data?.project.logo && (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1">
+                        <CheckCircle className="h-3 w-3 text-green-500" />
+                        Logo attached
+                      </Badge>
+                      <img
+                        src={data.project.logo}
+                        alt="Brand logo"
+                        className="h-8 w-auto max-w-[80px] object-contain rounded border bg-white p-0.5"
+                      />
+                    </div>
+                  )}
+                  {selectedProductImageUrls.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1">
+                          <Package className="h-3 w-3" />
+                          {selectedProductImageUrls.length} product image{selectedProductImageUrls.length !== 1 ? "s" : ""}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedProductImageUrls.map((url, i) => (
+                          <img
+                            key={i}
+                            src={url}
+                            alt={`Product ${i + 1}`}
+                            className="h-12 w-12 rounded border object-cover"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Style References (text) */}
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
@@ -3217,6 +3509,7 @@ export default function ProjectDetailPage({
                     setPrimaryRefIndex(null);
                     setMockupFormTouched(false);
                     setMockupStyleRef("");
+                    setSelectedProductImageUrls([]);
                     setShowMockupForm(true);
                   }}
                 >
@@ -3412,12 +3705,42 @@ export default function ProjectDetailPage({
               )}
               {viewingPromptLog.originalPrompt && (
                 <div>
-                  <h4 className="text-sm font-medium mb-1">Original AI Prompt</h4>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="text-sm font-medium">Original AI Prompt</h4>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => handleCopy(viewingPromptLog!.originalPrompt!, "originalPrompt")}
+                      title="Copy original prompt"
+                    >
+                      {copiedField === "originalPrompt" ? (
+                        <Check className="h-3.5 w-3.5 text-green-500" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
                   <pre className="text-xs bg-muted rounded-md p-3 whitespace-pre-wrap break-words max-h-60 overflow-y-auto">{viewingPromptLog.originalPrompt}</pre>
                 </div>
               )}
               <div>
-                <h4 className="text-sm font-medium mb-1">Final Prompt</h4>
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="text-sm font-medium">Final Prompt</h4>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handleCopy(viewingPromptLog!.prompt, "finalPrompt")}
+                    title="Copy final prompt"
+                  >
+                    {copiedField === "finalPrompt" ? (
+                      <Check className="h-3.5 w-3.5 text-green-500" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </div>
                 <pre className="text-xs bg-muted rounded-md p-3 whitespace-pre-wrap break-words max-h-60 overflow-y-auto">{viewingPromptLog.prompt}</pre>
               </div>
               {viewingPromptLog.styleRef && (

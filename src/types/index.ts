@@ -26,6 +26,7 @@ export interface Project {
   projectRequirements: string | null;
   clientNotes: string | null;
   crawlJobId: string | null;
+  logo: string | null;
   platformInfo: PlatformInfo | null;
   status: ProjectStatus;
   createdAt: Date;

@@ -137,14 +137,28 @@ export async function generateMockup(
   prompt: string,
   referenceImages?: string[],
   negativeReferenceImages?: string[],
-  primaryReferenceImage?: string
+  primaryReferenceImage?: string,
+  logoImage?: string,
+  productImageUrls?: string[],
+  aspectRatio?: string,
 ): Promise<{ image: string; text: string }> {
   const contents: Array<
     | { text: string }
     | { inlineData: { mimeType: string; data: string } }
   > = [];
 
-  // 1. PRIMARY REFERENCE — dominant visual influence, sent first
+  // 1. BRAND LOGO — exact logo to place in header/navigation
+  if (logoImage) {
+    const resolved = await resolveImageToBase64(logoImage);
+    if (resolved) {
+      contents.push({
+        text: "BRAND LOGO — this is the exact brand logo. Place it in the header/navigation area of the mockup. Do NOT generate, modify, or replace it. Use it exactly as provided:",
+      });
+      contents.push({ inlineData: resolved });
+    }
+  }
+
+  // 2. PRIMARY REFERENCE — dominant visual influence, sent first
   if (primaryReferenceImage) {
     const resolved = await resolveImageToBase64(primaryReferenceImage);
     if (resolved) {
@@ -187,7 +201,23 @@ export async function generateMockup(
     }
   }
 
-  // 4. Text prompt last
+  // 5. PRODUCT PHOTOGRAPHS — real product photos
+  if (productImageUrls && productImageUrls.length > 0) {
+    const resolved = await Promise.all(
+      productImageUrls.slice(0, 5).map(resolveImageToBase64)
+    );
+    const valid = resolved.filter(Boolean) as { mimeType: string; data: string }[];
+    if (valid.length > 0) {
+      contents.push({
+        text: "PRODUCT PHOTOGRAPHS — these are real product photos. Use them in product display areas, product cards, and hero sections. Do NOT generate fake product images — use these exact photos:",
+      });
+      for (const imgData of valid) {
+        contents.push({ inlineData: imgData });
+      }
+    }
+  }
+
+  // 6. Text prompt last
   contents.push({ text: prompt });
 
   const response = await getAI().models.generateContent({
@@ -195,6 +225,7 @@ export async function generateMockup(
     contents: [{ role: "user", parts: contents }],
     config: {
       responseModalities: ["TEXT", "IMAGE"],
+      ...(aspectRatio ? { imageConfig: { aspectRatio } } : {}),
     },
   });
 

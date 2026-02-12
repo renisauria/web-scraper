@@ -12,6 +12,7 @@ const updateProjectSchema = z.object({
   competitorAnalysis: z.string().optional(),
   projectRequirements: z.string().optional(),
   clientNotes: z.string().optional(),
+  logo: z.string().nullable().optional(),
   status: z.enum(["pending", "scraping", "scraped", "analyzing", "complete", "error"]).optional(),
 });
 
