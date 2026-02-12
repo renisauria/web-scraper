@@ -22,7 +22,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <div className="min-h-screen bg-background">
-          <nav className="border-b">
+          <nav className="bg-card">
             <div className="container mx-auto px-4">
               <div className="flex h-16 items-center justify-between">
                 <Link href="/" className="flex items-center gap-2 font-semibold text-lg">
