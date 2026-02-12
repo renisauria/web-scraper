@@ -1376,7 +1376,7 @@ export default function ProjectDetailPage({
                 <img
                   src={project.logo}
                   alt="Brand logo"
-                  className="h-10 w-auto max-w-[120px] object-contain rounded border bg-white p-1"
+                  className="h-10 w-auto max-w-[120px] object-contain rounded border bg-gray-100 p-1"
                 />
                 <div className="absolute inset-0 bg-black/60 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
                   <label className="cursor-pointer p-1 hover:bg-white/20 rounded" title="Replace logo">
@@ -3431,7 +3431,7 @@ export default function ProjectDetailPage({
                       <img
                         src={data.project.logo}
                         alt="Brand logo"
-                        className="h-8 w-auto max-w-[80px] object-contain rounded border bg-white p-0.5"
+                        className="h-8 w-auto max-w-[80px] object-contain rounded border bg-gray-100 p-0.5"
                       />
                     </div>
                   )}
@@ -3634,6 +3634,15 @@ export default function ProjectDetailPage({
                     >
                       <FileText className="h-3.5 w-3.5" />
                     </button>
+                    <a
+                      href={mockup.image}
+                      download={`mockup-${mockup.label || "design"}-${new Date(mockup.createdAt).toISOString().slice(0, 10)}.png`}
+                      className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-primary"
+                      onClick={(e) => e.stopPropagation()}
+                      title="Download image"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </a>
                     <button
                       type="button"
                       className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-destructive"
@@ -3689,12 +3698,21 @@ export default function ProjectDetailPage({
                   alt={`Mockup: ${viewingPromptLog.label || "AI Generated"}`}
                   className="w-full max-h-64 object-cover object-top"
                 />
-                <div className="absolute inset-0 bg-black/0 group-hover/mockthumb:bg-black/40 transition-colors flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/0 group-hover/mockthumb:bg-black/40 transition-colors flex items-center justify-center gap-3">
                   <span className="text-white text-sm font-medium opacity-0 group-hover/mockthumb:opacity-100 transition-opacity flex items-center gap-2">
                     <ImageIcon className="h-4 w-4" />
                     View Full Image
                   </span>
                 </div>
+                <a
+                  href={viewingPromptLog.image}
+                  download={`mockup-${viewingPromptLog.label || "design"}-${new Date(viewingPromptLog.createdAt).toISOString().slice(0, 10)}.png`}
+                  className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-primary opacity-0 group-hover/mockthumb:opacity-100 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}
+                  title="Download image"
+                >
+                  <Download className="h-4 w-4" />
+                </a>
               </div>
 
               {viewingPromptLog.customInstructions && (

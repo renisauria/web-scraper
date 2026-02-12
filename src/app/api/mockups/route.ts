@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import { generateMockup } from "@/lib/gemini";
-import { compressScreenshot } from "@/lib/screenshot-compress";
+import { upscaleImage } from "@/lib/screenshot-compress";
 import { logError } from "@/lib/error-logger";
 import { normalizeReferenceImages } from "@/types";
 import type { Competitor } from "@/types";
@@ -91,8 +91,8 @@ export async function POST(request: NextRequest) {
       aspectRatio,
     );
 
-    // Compress mockup image to WebP
-    const compressedImage = (await compressScreenshot(result.image)) ?? result.image;
+    // Upscale mockup to 2x for high-res output (Gemini ignores imageSize with reference images)
+    const upscaledImage = (await upscaleImage(result.image, 2, 90)) ?? result.image;
 
     // Save to DB
     const mockupId = uuidv4();
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       id: mockupId,
       projectId,
       prompt,
-      image: compressedImage,
+      image: upscaledImage,
       label: label || null,
       style: style || null,
       originalPrompt: originalPrompt || null,

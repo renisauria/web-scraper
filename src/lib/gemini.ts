@@ -148,13 +148,14 @@ export async function generateMockup(
   > = [];
 
   // 1. BRAND LOGO — exact logo to place in header/navigation
+  let resolvedLogo: { mimeType: string; data: string } | null = null;
   if (logoImage) {
-    const resolved = await resolveImageToBase64(logoImage);
-    if (resolved) {
+    resolvedLogo = await resolveImageToBase64(logoImage);
+    if (resolvedLogo) {
       contents.push({
-        text: "BRAND LOGO — this is the exact brand logo. Place it in the header/navigation area of the mockup. Do NOT generate, modify, or replace it. Use it exactly as provided:",
+        text: "CRITICAL — BRAND LOGO: The following image is the client's EXACT brand logo. You MUST reproduce this logo pixel-for-pixel in the top-left of the website header/navigation bar. Do NOT invent a different logo, do NOT modify it, do NOT replace it with text. Copy this exact logo image into the mockup:",
       });
-      contents.push({ inlineData: resolved });
+      contents.push({ inlineData: resolvedLogo });
     }
   }
 
@@ -217,7 +218,15 @@ export async function generateMockup(
     }
   }
 
-  // 6. Text prompt last
+  // 6. Reinforce logo right before prompt for stronger signal
+  if (resolvedLogo) {
+    contents.push({
+      text: "REMINDER — here is the brand logo again. This EXACT logo must appear in the website header. Do not generate a different logo:",
+    });
+    contents.push({ inlineData: resolvedLogo });
+  }
+
+  // 7. Text prompt last
   contents.push({ text: prompt });
 
   const response = await getAI().models.generateContent({
@@ -225,7 +234,10 @@ export async function generateMockup(
     contents: [{ role: "user", parts: contents }],
     config: {
       responseModalities: ["TEXT", "IMAGE"],
-      ...(aspectRatio ? { imageConfig: { aspectRatio } } : {}),
+      imageConfig: {
+        ...(aspectRatio ? { aspectRatio } : {}),
+        imageSize: "2K",
+      },
     },
   });
 
