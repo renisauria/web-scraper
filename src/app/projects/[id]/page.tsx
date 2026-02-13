@@ -67,7 +67,6 @@ import {
   Lightbulb,
   ArrowRight,
   Archive,
-  ArrowCounterClockwise,
   ClockCounterClockwise,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -114,7 +113,6 @@ export default function ProjectDetailPage({
   const [editingContext, setEditingContext] = useState(false);
   const [contextForm, setContextForm] = useState({ clientProblems: "", competitorAnalysis: "", projectRequirements: "", clientNotes: "" });
   const [savingContext, setSavingContext] = useState(false);
-  const [expandedContextSections, setExpandedContextSections] = useState<Set<string>>(new Set());
   const [activeContextTab, setActiveContextTab] = useState<string | null>(null);
   const [addingCompetitor, setAddingCompetitor] = useState(false);
   const [competitorForm, setCompetitorForm] = useState({ name: "", url: "", type: "competitor" as CompetitorType, preferredFeature: "", preferredFeatureUrl: "", notes: "", screenshotLabel: null as ScreenshotLabel | null });
