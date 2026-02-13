@@ -33,35 +33,14 @@ export async function GET(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const pages = await db
-      .select()
-      .from(schema.pages)
-      .where(eq(schema.pages.projectId, id));
-
-    const analyses = await db
-      .select()
-      .from(schema.analyses)
-      .where(eq(schema.analyses.projectId, id));
-
-    const competitors = await db
-      .select()
-      .from(schema.competitors)
-      .where(eq(schema.competitors.projectId, id));
-
-    const mockups = await db
-      .select()
-      .from(schema.mockups)
-      .where(eq(schema.mockups.projectId, id));
-
-    const savedPrompts = await db
-      .select()
-      .from(schema.savedPrompts)
-      .where(eq(schema.savedPrompts.projectId, id));
-
-    const products = await db
-      .select()
-      .from(schema.products)
-      .where(eq(schema.products.projectId, id));
+    const [pages, analyses, competitors, mockups, savedPrompts, products] = await Promise.all([
+      db.select().from(schema.pages).where(eq(schema.pages.projectId, id)),
+      db.select().from(schema.analyses).where(eq(schema.analyses.projectId, id)),
+      db.select().from(schema.competitors).where(eq(schema.competitors.projectId, id)),
+      db.select().from(schema.mockups).where(eq(schema.mockups.projectId, id)),
+      db.select().from(schema.savedPrompts).where(eq(schema.savedPrompts.projectId, id)),
+      db.select().from(schema.products).where(eq(schema.products.projectId, id)),
+    ]);
 
     return NextResponse.json({
       project: project[0],
