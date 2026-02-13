@@ -5,24 +5,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
-  Home,
+  House,
   ShoppingBag,
   Package,
   FileText,
   BookOpen,
   Newspaper,
   File,
-  ChevronRight,
-  ChevronDown,
-  Loader2,
-  ExternalLink,
-  RefreshCw,
+  CaretRight,
+  CaretDown,
+  SpinnerGap,
+  ArrowSquareOut,
+  ArrowsClockwise,
   ArrowUpRight,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import type { SitemapNode } from "@/types";
 
 const pageTypeIcons: Record<string, React.ReactNode> = {
-  homepage: <Home className="h-4 w-4" />,
+  homepage: <House className="h-4 w-4" />,
   collection: <ShoppingBag className="h-4 w-4" />,
   product: <Package className="h-4 w-4" />,
   page: <FileText className="h-4 w-4" />,
@@ -91,9 +91,9 @@ function SitemapTreeNode({
           className={`mt-0.5 shrink-0 ${hasChildren ? "cursor-pointer text-muted-foreground hover:text-foreground" : "invisible"}`}
         >
           {expanded ? (
-            <ChevronDown className="h-4 w-4" />
+            <CaretDown className="h-4 w-4" />
           ) : (
-            <ChevronRight className="h-4 w-4" />
+            <CaretRight className="h-4 w-4" />
           )}
         </button>
 
@@ -114,7 +114,7 @@ function SitemapTreeNode({
                 onClick={(e) => e.stopPropagation()}
               >
                 {node.label}
-                <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                <ArrowSquareOut className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
               </a>
             ) : (
               <span
@@ -183,7 +183,7 @@ function SitemapTreeNode({
               >
                 {scrapingId === node.id ? (
                   <>
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
                     Scraping...
                   </>
                 ) : (
@@ -205,12 +205,12 @@ function SitemapTreeNode({
               >
                 {rescrapingId === node.id ? (
                   <>
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
                     Scraping...
                   </>
                 ) : (
                   <>
-                    <RefreshCw className="h-3 w-3 mr-1" />
+                    <ArrowsClockwise className="h-3 w-3 mr-1" />
                     Scrape again
                   </>
                 )}

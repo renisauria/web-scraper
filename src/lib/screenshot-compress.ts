@@ -1,18 +1,45 @@
 import sharp from "sharp";
 
 /**
- * Compress a base64 data URI screenshot to WebP format.
+ * Download an image URL and return a base64 data-URI.
+ * Returns null on failure.
+ */
+async function downloadToDataUri(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const contentType = res.headers.get("content-type") || "image/png";
+    return `data:${contentType};base64,${buffer.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compress a screenshot to a WebP data URI.
+ * Accepts either a base64 data URI or an HTTP(S) URL (e.g. signed Firecrawl URLs).
  * Falls back to the original on any error.
  */
 export async function compressScreenshot(
-  dataUri: string | null
+  input: string | null
 ): Promise<string | null> {
-  if (!dataUri || !dataUri.startsWith("data:image/")) {
+  if (!input) return null;
+
+  // If it's a URL, download it first
+  let dataUri = input;
+  if (input.startsWith("http://") || input.startsWith("https://")) {
+    const downloaded = await downloadToDataUri(input);
+    if (!downloaded) return null;
+    dataUri = downloaded;
+  }
+
+  if (!dataUri.startsWith("data:image/")) {
     return dataUri;
   }
 
   try {
-    const base64Data = dataUri.replace(/^data:image\/\w+;base64,/, "");
+    const base64Data = dataUri.replace(/^data:image\/[^;]+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
     const webpBuffer = await sharp(buffer).webp({ quality: 80 }).toBuffer();
     return `data:image/webp;base64,${webpBuffer.toString("base64")}`;

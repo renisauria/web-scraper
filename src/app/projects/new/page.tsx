@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
+import { ArrowLeft, SpinnerGap, WarningCircle } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -91,7 +91,7 @@ export default function NewProjectPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
+                <WarningCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
@@ -172,7 +172,7 @@ export default function NewProjectPage() {
 
             <div className="flex gap-4">
               <Button type="submit" disabled={loading}>
-                {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {loading && <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />}
                 Create Project
               </Button>
               <Link href="/projects">

@@ -58,11 +58,6 @@ export async function GET(
       .from(schema.savedPrompts)
       .where(eq(schema.savedPrompts.projectId, id));
 
-    const designKits = await db
-      .select()
-      .from(schema.designKits)
-      .where(eq(schema.designKits.projectId, id));
-
     const products = await db
       .select()
       .from(schema.products)
@@ -75,7 +70,6 @@ export async function GET(
       competitors,
       mockups,
       savedPrompts,
-      designKit: designKits[0] || null,
       products,
     });
   } catch (error) {
@@ -106,11 +100,15 @@ export async function PATCH(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
+    const contextFields = ["clientProblems", "competitorAnalysis", "projectRequirements", "clientNotes"];
+    const isContextUpdate = contextFields.some((f) => f in validatedData);
+
     await db
       .update(schema.projects)
       .set({
         ...validatedData,
         updatedAt: new Date(),
+        ...(isContextUpdate ? { contextUpdatedAt: new Date() } : {}),
       })
       .where(eq(schema.projects.id, id));
 

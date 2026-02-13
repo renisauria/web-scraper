@@ -474,7 +474,7 @@ export async function generateMockupPrompt(
   },
   analyses: { type: string; content: Record<string, unknown> | null }[],
   competitors: { name: string; url: string; type?: string; preferredFeature?: string | null; notes?: string | null; screenshotLabel?: string | null; screenshot?: string | null; referenceImages?: { url: string; tag: "emulate" | "avoid" | null }[] | null }[],
-  options: { style: string; pageType: string; aspectRatio?: string; customInstructions?: string; designTokensContext?: string; productContext?: string; hasPrimaryReference?: boolean; referenceImageCount?: number; hasLogo?: boolean; selectedProductImageCount?: number }
+  options: { style: string; pageType: string; aspectRatio?: string; customInstructions?: string; productContext?: string; hasPrimaryReference?: boolean; referenceImageCount?: number; hasLogo?: boolean; selectedProductImageCount?: number }
 ): Promise<{ prompt: string }> {
   const systemPrompt = `You are an elite prompt engineer specializing in crafting image-generation prompts for AI models like Google Gemini Imagen. Your job is to take project context and produce a single, hyper-detailed image prompt that will generate a stunning, realistic website mockup screenshot.
 
@@ -487,13 +487,13 @@ RULES FOR THE PROMPT YOU WRITE:
 6. INCLUDE NEGATIVE GUIDANCE — "Not a wireframe. Not a low-fidelity sketch. No lorem ipsum placeholder text — use realistic English copy. No watermarks. No UI kit component sheets."
 7. ANCHOR QUALITY — "Awwwards-quality design. Behance featured project level. Pixel-perfect rendering."
 8. INCLUDE REALISTIC CONTENT — suggest actual headline text, button labels, and section copy that match the brand.
-9. USE PROVIDED DESIGN TOKENS — ONLY if design tokens are explicitly provided, use their exact hex codes, font names, and spacing values. If no tokens are provided, do NOT invent colors or fonts — defer entirely to the visual reference screenshots.
-10. USE REAL PRODUCT DATA — if product data is provided, use exact product names, prices, descriptions, and variant info. Show real product cards with real names and prices, not placeholder text.
+9. USE REAL PRODUCT DATA — if product data is provided, use exact product names, prices, descriptions, and variant info. Show real product cards with real names and prices, not placeholder text.
 11. USE COMPETITOR GUIDANCE — if competitors are labeled as POSITIVE INSPIRATION, emulate their design patterns and visual strengths. If competitors are labeled as NEGATIVE EXAMPLES, explicitly avoid their design patterns and shortcomings.
 12. REFERENCE ATTACHED SCREENSHOTS — if competitors have attached reference screenshots, your prompt MUST explicitly reference them using their individual tags. Screenshots tagged "emulate" mean: copy and draw from their design patterns, layout, and visual style. Screenshots tagged "avoid" mean: do NOT replicate those layouts, styles, or patterns — design away from them. For each competitor with attached images, write specific instructions like "Draw from the attached 'emulate' reference from [Competitor Name] for layout cues" or "The attached 'avoid' reference from [Competitor Name] shows patterns to steer away from". Be specific about what visual elements to use or reject. The image-generation model will receive these screenshots alongside your prompt.
 13. PRIMARY VISUAL REFERENCE — if a PRIMARY REFERENCE image is mentioned, instruct the image model to treat it as the dominant visual influence. The mockup should closely match its layout, color palette, typography, and overall aesthetic above all other references.
-14. BRAND LOGO — if a real brand logo is being attached, instruct the image model to place the exact logo in the header/navigation area. Do NOT describe a made-up logo or suggest generating one — the real logo image will be provided to the image model directly.
+14. BRAND LOGO — if a brand logo is mentioned, instruct the image model to leave an EMPTY SPACE in the top-left of the header/navigation where the logo will be composited in post-production. The space should blend seamlessly with the header background — no borders, no outlines, no placeholder shapes, no text. Just empty space. Do NOT describe a logo or suggest generating one.
 15. PRODUCT PHOTOGRAPHS — if real product photos are being attached, instruct the image model to use them in product cards, hero sections, and product display areas. Do NOT describe placeholder product images — the real product photos will be provided to the image model directly.
+16. TYPOGRAPHY AS STYLE GUIDANCE — when font names are mentioned (e.g. "Inter", "Playfair Display", "Montserrat"), do NOT include the exact font name in the prompt. Instead, translate the font into descriptive visual characteristics the image model can understand. For example: "Inter" → "clean geometric sans-serif with even letter spacing", "Playfair Display" → "elegant high-contrast serif with thin strokes and ball terminals", "Roboto Mono" → "monospaced technical typeface". Describe weight, style, contrast, and personality rather than naming the font.
 
 Return ONLY the complete image-generation prompt as plain text (no JSON wrapper, no markdown, no explanation). The prompt should be 400-800 words.`;
 
@@ -583,10 +583,6 @@ Return ONLY the complete image-generation prompt as plain text (no JSON wrapper,
     contextParts.push(`Competitor/inspiration sites (reference screenshots will be attached to the image model — respect each image's individual "emulate" or "avoid" tag):\n${unlabeledComps.slice(0, 5).map(formatCompDetail).join("\n")}`);
   }
 
-  if (options.designTokensContext) {
-    contextParts.push(`Design Tokens (use these exact values):\n${options.designTokensContext}`);
-  }
-
   if (options.productContext) {
     contextParts.push(options.productContext);
   }
@@ -601,7 +597,7 @@ Return ONLY the complete image-generation prompt as plain text (no JSON wrapper,
   }
 
   if (options.hasLogo) {
-    contextParts.push(`BRAND LOGO: The client's real brand logo will be attached to the image generation model. Instruct the model to place the exact logo in the header/navigation — do NOT describe a made-up logo.`);
+    contextParts.push(`BRAND LOGO: The client has a brand logo that will be composited onto the mockup in post-production. Instruct the image model to leave an empty space in the top-left of the header/navigation area — just the header background color, no borders or shapes. Do NOT describe or generate any logo.`);
   }
 
   if (options.selectedProductImageCount && options.selectedProductImageCount > 0) {

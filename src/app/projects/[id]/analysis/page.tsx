@@ -17,17 +17,17 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ArrowLeft,
-  Loader2,
-  AlertCircle,
-  BarChart3,
-  Code2,
+  SpinnerGap,
+  WarningCircle,
+  ChartBar,
+  CodeBlock,
   Layout,
-  Zap,
+  Lightning,
   Lightbulb,
   FileText,
   CheckCircle,
   XCircle,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import type { Project, Analysis } from "@/types";
 
 interface ProjectData {
@@ -76,7 +76,7 @@ export default function AnalysisPage({
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <SpinnerGap className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -84,7 +84,7 @@ export default function AnalysisPage({
   if (!data || data.analyses.length === 0) {
     return (
       <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
+        <WarningCircle className="h-4 w-4" />
         <AlertDescription>
           No analysis data found. Please run the analysis first.
         </AlertDescription>
@@ -122,7 +122,7 @@ export default function AnalysisPage({
 
       {error && (
         <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
+          <WarningCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -130,11 +130,11 @@ export default function AnalysisPage({
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="marketing" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
+            <ChartBar className="h-4 w-4" />
             <span className="hidden sm:inline">Marketing</span>
           </TabsTrigger>
           <TabsTrigger value="techstack" className="flex items-center gap-2">
-            <Code2 className="h-4 w-4" />
+            <CodeBlock className="h-4 w-4" />
             <span className="hidden sm:inline">Tech Stack</span>
           </TabsTrigger>
           <TabsTrigger value="architecture" className="flex items-center gap-2">
@@ -142,7 +142,7 @@ export default function AnalysisPage({
             <span className="hidden sm:inline">Architecture</span>
           </TabsTrigger>
           <TabsTrigger value="performance" className="flex items-center gap-2">
-            <Zap className="h-4 w-4" />
+            <Lightning className="h-4 w-4" />
             <span className="hidden sm:inline">Performance</span>
           </TabsTrigger>
           <TabsTrigger value="recommendations" className="flex items-center gap-2">
@@ -592,7 +592,7 @@ function PerformanceAnalysis({ data }: { data: Record<string, unknown> | undefin
               <ul className="space-y-1">
                 {d.pageSpeed.concerns.map((c, i) => (
                   <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+                    <WarningCircle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
                     {c}
                   </li>
                 ))}
@@ -815,7 +815,7 @@ function NoDataCard() {
   return (
     <Card>
       <CardContent className="py-8 text-center">
-        <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+        <WarningCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
         <p className="text-muted-foreground">No analysis data available for this category.</p>
       </CardContent>
     </Card>

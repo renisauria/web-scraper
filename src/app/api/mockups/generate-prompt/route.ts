@@ -3,7 +3,6 @@ import { db, schema } from "@/lib/db";
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { generateMockupPrompt } from "@/lib/anthropic";
-import { parseDesignTokens, formatTokensForPrompt } from "@/lib/design-tokens";
 import { formatProductsForPrompt } from "@/lib/product-formatter";
 import { logError } from "@/lib/error-logger";
 import { normalizeReferenceImages } from "@/types";
@@ -65,24 +64,6 @@ export async function POST(request: NextRequest) {
       referenceImages: normalizeReferenceImages(c.referenceImages),
     }));
 
-    // Fetch design kit for the project and format tokens for prompt
-    let designTokensContext: string | undefined;
-    const designKits = await db
-      .select()
-      .from(schema.designKits)
-      .where(eq(schema.designKits.projectId, projectId));
-
-    if (designKits.length > 0 && designKits[0].tokens) {
-      let tokens = designKits[0].tokens as Record<string, unknown>;
-      if (typeof tokens === "string") {
-        try { tokens = JSON.parse(tokens); } catch { tokens = {}; }
-      }
-      const flat = parseDesignTokens(tokens);
-      if (flat.length > 0) {
-        designTokensContext = formatTokensForPrompt(flat);
-      }
-    }
-
     // Fetch selected products and format for prompt
     let productContext: string | undefined;
     if (selectedProductIds && selectedProductIds.length > 0) {
@@ -102,7 +83,6 @@ export async function POST(request: NextRequest) {
       pageType,
       aspectRatio,
       customInstructions: customInstructions || undefined,
-      designTokensContext,
       productContext,
       hasPrimaryReference,
       referenceImageCount,

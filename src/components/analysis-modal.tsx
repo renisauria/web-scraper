@@ -2,6 +2,7 @@
 
 import Lottie from "lottie-react";
 import { useEffect, useState } from "react";
+import { ChartBar, GearSix, TreeStructure, Lightning, Lightbulb } from "@phosphor-icons/react";
 
 // AI Brain animation - a nice animated brain/thinking visualization
 const brainAnimation = {
@@ -184,11 +185,11 @@ const brainAnimation = {
 };
 
 const analysisSteps = [
-  { label: "Marketing & SEO", icon: "📊" },
-  { label: "Tech Stack Detection", icon: "⚙️" },
-  { label: "Site Architecture", icon: "🏗️" },
-  { label: "Performance Analysis", icon: "⚡" },
-  { label: "Generating Recommendations", icon: "💡" },
+  { label: "Marketing & SEO", icon: ChartBar },
+  { label: "Tech Stack Detection", icon: GearSix },
+  { label: "Site Architecture", icon: TreeStructure },
+  { label: "Performance Analysis", icon: Lightning },
+  { label: "Generating Recommendations", icon: Lightbulb },
 ];
 
 interface AnalysisModalProps {
@@ -253,7 +254,7 @@ export function AnalysisModal({ isOpen }: AnalysisModalProps) {
 
         {/* Subtitle */}
         <p className="text-center text-muted-foreground mb-6">
-          Analyzing your website with GPT-4{dots}
+          Analyzing your website with Claude{dots}
         </p>
 
         {/* Progress Steps */}
@@ -269,9 +270,7 @@ export function AnalysisModal({ isOpen }: AnalysisModalProps) {
                   : "opacity-40"
               }`}
             >
-              <span className={`text-xl transition-transform duration-300 ${index === currentStep ? "scale-125" : ""}`}>
-                {step.icon}
-              </span>
+              <step.icon className={`h-5 w-5 transition-transform duration-300 ${index === currentStep ? "scale-125 text-purple-600 dark:text-purple-400" : "text-muted-foreground"}`} weight={index === currentStep ? "fill" : "regular"} />
               <span
                 className={`font-medium flex-1 ${
                   index === currentStep

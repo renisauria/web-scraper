@@ -147,13 +147,14 @@ export async function generateMockup(
     | { inlineData: { mimeType: string; data: string } }
   > = [];
 
-  // 1. BRAND LOGO — exact logo to place in header/navigation
-  let resolvedLogo: { mimeType: string; data: string } | null = null;
+  // 1. BRAND LOGO — leave a placeholder space for later compositing
+  let hasLogo = false;
   if (logoImage) {
-    resolvedLogo = await resolveImageToBase64(logoImage);
+    const resolvedLogo = await resolveImageToBase64(logoImage);
     if (resolvedLogo) {
+      hasLogo = true;
       contents.push({
-        text: "CRITICAL — BRAND LOGO: The following image is the client's EXACT brand logo. You MUST reproduce this logo pixel-for-pixel in the top-left of the website header/navigation bar. Do NOT invent a different logo, do NOT modify it, do NOT replace it with text. Copy this exact logo image into the mockup:",
+        text: "BRAND LOGO PLACEHOLDER: The following image is the client's brand logo. Study its aspect ratio and proportions. In the top-left of the website header/navigation bar, leave an EMPTY SPACE where this logo will be composited later. The space should show only the header's background color — NO rectangle, NO border, NO outline, NO text, NO icon, NO shape. Just blank empty space matching the surrounding header background. Size the gap to match the logo's approximate aspect ratio. Do NOT attempt to draw or recreate the logo:",
       });
       contents.push({ inlineData: resolvedLogo });
     }
@@ -218,15 +219,19 @@ export async function generateMockup(
     }
   }
 
-  // 6. Reinforce logo right before prompt for stronger signal
-  if (resolvedLogo) {
+  // 6. Reinforce logo placeholder instruction
+  if (hasLogo) {
     contents.push({
-      text: "REMINDER — here is the brand logo again. This EXACT logo must appear in the website header. Do not generate a different logo:",
+      text: "REMINDER — do NOT draw any logo in the header. Leave that area completely empty — just the header background color, no borders or shapes. The logo will be composited in post-production.",
     });
-    contents.push({ inlineData: resolvedLogo });
   }
 
-  // 7. Text prompt last
+  // 7. Typography guidance
+  contents.push({
+    text: "TYPOGRAPHY NOTE: Any font names in the prompt are style guidance, not exact typefaces. Interpret them as visual characteristics — e.g. a 'geometric sans-serif' means clean, even strokes with uniform letter shapes; a 'high-contrast serif' means elegant letters with thick/thin stroke variation. Match the described style and personality, not a specific named font.",
+  });
+
+  // 8. Text prompt last
   contents.push({ text: prompt });
 
   const response = await getAI().models.generateContent({

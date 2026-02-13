@@ -14,13 +14,13 @@ import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   Globe,
-  BarChart3,
-  Code2,
+  ChartBar,
+  CodeBlock,
   Layout,
-  Zap,
+  Lightning,
   ArrowRight,
-  Loader2,
-} from "lucide-react";
+  SpinnerGap,
+} from "@phosphor-icons/react";
 import type { Project } from "@/types";
 
 export default function Home() {
@@ -49,7 +49,7 @@ export default function Home() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <SpinnerGap className="h-8 w-8 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground animate-pulse">Loading your projects...</p>
       </div>
     );
@@ -85,7 +85,7 @@ export default function Home() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <ChartBar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{completedCount}</div>
@@ -94,7 +94,7 @@ export default function Home() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
+            <Lightning className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -105,7 +105,7 @@ export default function Home() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Ready to Analyze</CardTitle>
-            <Code2 className="h-4 w-4 text-muted-foreground" />
+            <CodeBlock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -177,7 +177,7 @@ export default function Home() {
             <div className="space-y-4">
               <div className="flex items-start gap-3">
                 <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-                  <BarChart3 className="h-4 w-4 text-blue-500" />
+                  <ChartBar className="h-4 w-4 text-blue-500" />
                 </div>
                 <div>
                   <p className="font-medium">Marketing Analysis</p>
@@ -188,7 +188,7 @@ export default function Home() {
               </div>
               <div className="flex items-start gap-3">
                 <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
-                  <Code2 className="h-4 w-4 text-green-500" />
+                  <CodeBlock className="h-4 w-4 text-green-500" />
                 </div>
                 <div>
                   <p className="font-medium">Tech Stack Detection</p>
@@ -210,7 +210,7 @@ export default function Home() {
               </div>
               <div className="flex items-start gap-3">
                 <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0">
-                  <Zap className="h-4 w-4 text-orange-500" />
+                  <Lightning className="h-4 w-4 text-orange-500" />
                 </div>
                 <div>
                   <p className="font-medium">Performance Indicators</p>
