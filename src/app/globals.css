@@ -8,6 +8,20 @@
   }
 }
 
+.blueprint-grid {
+  background-image:
+    linear-gradient(to right, rgb(99 102 241 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(99 102 241 / 0.04) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.dark .blueprint-grid {
+  background-image:
+    linear-gradient(to right, rgb(129 140 248 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(129 140 248 / 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
 
 
 @layer base {
@@ -74,6 +88,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image: radial-gradient(circle, hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  .dark body {
+    background-image: radial-gradient(circle, hsl(var(--muted-foreground) / 0.1) 1px, transparent 1px);
   }
 }
 

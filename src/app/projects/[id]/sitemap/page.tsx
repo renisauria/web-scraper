@@ -14,18 +14,19 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ArrowLeft,
-  Loader2,
-  AlertCircle,
-  Map,
+  SpinnerGap,
+  WarningCircle,
+  MapTrifold,
   Brain,
-  TreePine,
-  Layers,
-  Sparkles,
-  FileDown,
-} from "lucide-react";
+  Tree,
+  Stack,
+  Sparkle,
+  FileArrowDown,
+} from "@phosphor-icons/react";
 import { SitemapTree } from "@/components/sitemap-tree";
 import { toast } from "sonner";
 import type { SitemapData, SitemapNode } from "@/types";
+import { formatDate } from "@/lib/format-date";
 
 type TabType = "current" | "recommended";
 
@@ -272,7 +273,7 @@ export default function SitemapPage({
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <SpinnerGap className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -293,13 +294,13 @@ export default function SitemapPage({
       </div>
 
       <div className="flex items-center gap-3">
-        <Map className="h-6 w-6" />
+        <MapTrifold className="h-6 w-6" />
         <h1 className="text-2xl font-bold tracking-tight">Sitemap</h1>
       </div>
 
       {error && (
         <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
+          <WarningCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -311,7 +312,7 @@ export default function SitemapPage({
           onClick={() => setActiveTab("current")}
           size="sm"
         >
-          <TreePine className="h-4 w-4 mr-2" />
+          <Tree className="h-4 w-4 mr-2" />
           Current Sitemap
         </Button>
         <Button
@@ -319,7 +320,7 @@ export default function SitemapPage({
           onClick={() => setActiveTab("recommended")}
           size="sm"
         >
-          <Sparkles className="h-4 w-4 mr-2" />
+          <Sparkle className="h-4 w-4 mr-2" />
           Recommended Sitemap
         </Button>
       </div>
@@ -346,9 +347,9 @@ export default function SitemapPage({
                   size="sm"
                 >
                   {generating ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
                   ) : activeTab === "current" ? (
-                    <TreePine className="h-4 w-4 mr-2" />
+                    <Tree className="h-4 w-4 mr-2" />
                   ) : (
                     <Brain className="h-4 w-4 mr-2" />
                   )}
@@ -384,7 +385,7 @@ export default function SitemapPage({
                 </div>
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
-                  <Map className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <MapTrifold className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-lg font-medium mb-2">
                     No {activeTab} sitemap generated yet
                   </p>
@@ -411,8 +412,7 @@ export default function SitemapPage({
                     {sitemapStats.total} pages across {sitemapStats.types.length} types
                     {activeSitemap && (
                       <span className="block mt-1 text-muted-foreground/70">
-                        Collected {new Date(activeSitemap.generatedAt).toLocaleDateString()} at{" "}
-                        {new Date(activeSitemap.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        Collected {formatDate(activeSitemap.generatedAt)}
                       </span>
                     )}
                   </CardDescription>
@@ -506,9 +506,9 @@ export default function SitemapPage({
                 size="sm"
               >
                 {importing ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
-                  <FileDown className="h-4 w-4 mr-2" />
+                  <FileArrowDown className="h-4 w-4 mr-2" />
                 )}
                 {importing ? "Importing..." : "Import Sitemap"}
               </Button>
@@ -541,7 +541,7 @@ export default function SitemapPage({
                   <ul className="space-y-2">
                     {recommendedSitemap.keyChanges.map((change, i) => (
                       <li key={i} className="text-sm text-muted-foreground flex gap-2">
-                        <Layers className="h-4 w-4 shrink-0 mt-0.5" />
+                        <Stack className="h-4 w-4 shrink-0 mt-0.5" />
                         <span>{change}</span>
                       </li>
                     ))}

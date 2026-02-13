@@ -16,19 +16,20 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ArrowLeft,
-  Loader2,
-  AlertCircle,
-  Download,
+  SpinnerGap,
+  WarningCircle,
+  DownloadSimple,
   Copy,
   Check,
-  BarChart3,
-  Code2,
+  ChartBar,
+  CodeBlock,
   Layout,
-  Zap,
+  Lightning,
   Lightbulb,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { Project, Analysis } from "@/types";
+import { formatDate } from "@/lib/format-date";
 
 interface ProjectData {
   project: Project;
@@ -81,7 +82,7 @@ export default function ReportPage({
     if (project.clientName) {
       md += `**Client:** ${project.clientName}\n`;
     }
-    md += `**Generated:** ${new Date().toLocaleDateString()}\n\n`;
+    md += `**Generated:** ${formatDate(new Date())}\n\n`;
     md += `---\n\n`;
 
     // Marketing
@@ -236,7 +237,7 @@ export default function ReportPage({
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <SpinnerGap className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -244,7 +245,7 @@ export default function ReportPage({
   if (!data || data.analyses.length === 0) {
     return (
       <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
+        <WarningCircle className="h-4 w-4" />
         <AlertDescription>
           No analysis data found. Please run the analysis first.
         </AlertDescription>
@@ -282,7 +283,7 @@ export default function ReportPage({
             {copied ? "Copied!" : "Copy Markdown"}
           </Button>
           <Button onClick={downloadMarkdown}>
-            <Download className="h-4 w-4 mr-2" />
+            <DownloadSimple className="h-4 w-4 mr-2" />
             Download Report
           </Button>
         </div>
@@ -290,7 +291,7 @@ export default function ReportPage({
 
       {error && (
         <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
+          <WarningCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -308,12 +309,12 @@ export default function ReportPage({
             <h2 className="text-xl font-semibold mb-4">Executive Summary</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <SummaryCard
-                icon={<BarChart3 className="h-5 w-5 text-blue-500" />}
+                icon={<ChartBar className="h-5 w-5 text-blue-500" />}
                 title="Marketing"
                 status={analysisMap.has("marketing")}
               />
               <SummaryCard
-                icon={<Code2 className="h-5 w-5 text-green-500" />}
+                icon={<CodeBlock className="h-5 w-5 text-green-500" />}
                 title="Tech Stack"
                 status={analysisMap.has("techstack")}
               />
@@ -323,7 +324,7 @@ export default function ReportPage({
                 status={analysisMap.has("architecture")}
               />
               <SummaryCard
-                icon={<Zap className="h-5 w-5 text-orange-500" />}
+                icon={<Lightning className="h-5 w-5 text-orange-500" />}
                 title="Performance"
                 status={analysisMap.has("performance")}
               />
@@ -338,14 +339,14 @@ export default function ReportPage({
             <div className="space-y-4">
               {analysisMap.has("marketing") && (
                 <FindingItem
-                  icon={<BarChart3 className="h-4 w-4" />}
+                  icon={<ChartBar className="h-4 w-4" />}
                   title="Marketing"
                   summary={(analysisMap.get("marketing") as Record<string, unknown>)?.summary as string}
                 />
               )}
               {analysisMap.has("techstack") && (
                 <FindingItem
-                  icon={<Code2 className="h-4 w-4" />}
+                  icon={<CodeBlock className="h-4 w-4" />}
                   title="Tech Stack"
                   summary={(analysisMap.get("techstack") as Record<string, unknown>)?.summary as string}
                 />
@@ -359,7 +360,7 @@ export default function ReportPage({
               )}
               {analysisMap.has("performance") && (
                 <FindingItem
-                  icon={<Zap className="h-4 w-4" />}
+                  icon={<Lightning className="h-4 w-4" />}
                   title="Performance"
                   summary={(analysisMap.get("performance") as Record<string, unknown>)?.summary as string}
                 />

@@ -14,42 +14,37 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  ChevronRight,
+  CaretRight,
   Globe,
-  ExternalLink,
-  Loader2,
-  AlertCircle,
-  Calendar,
-  RefreshCw,
+  ArrowSquareOut,
+  SpinnerGap,
+  WarningCircle,
+  CalendarBlank,
+  ArrowsClockwise,
   FileText,
   Image as ImageIcon,
   Code,
-  Tags,
+  Tag as TagIcon,
   Info,
-  History,
+  ClockCounterClockwise,
   Clock,
   Eye,
   Camera,
-  Maximize2,
-  Trash2,
+  ArrowsOut,
+  Trash,
   ShoppingBag,
-  DollarSign,
+  CurrencyDollar,
   Tag,
-  Layers,
-  ChevronDown,
-} from "lucide-react";
+  Stack,
+  CaretDown,
+  Copy,
+  Check,
+  Archive,
+  ArrowCounterClockwise,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { Page, PageVersion, Project, Product } from "@/types";
-
-function formatVersionDate(date: Date | string): string {
-  const d = new Date(date);
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { formatDate } from "@/lib/format-date";
 
 interface PageData {
   page: Page;
@@ -74,6 +69,35 @@ export default function PageDetailView({
   const [viewingScreenshot, setViewingScreenshot] = useState<{ url: string; title: string } | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<PageVersion | null>(null);
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
+
+  async function handleToggleArchive() {
+    if (!data) return;
+    const newVal = data.page.archived === 1 ? 0 : 1;
+    setArchiving(true);
+    try {
+      const res = await fetch(`/api/pages/${pageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: newVal }),
+      });
+      if (!res.ok) throw new Error("Failed to update page");
+      await fetchPage();
+      toast.success(newVal ? "Page archived" : "Page restored");
+    } catch {
+      toast.error("Failed to update page");
+    } finally {
+      setArchiving(false);
+    }
+  }
+
+  async function handleCopy(text: string, field: string) {
+    await navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    toast.success("Copied to clipboard");
+    setTimeout(() => setCopiedField(null), 2000);
+  }
 
   const fetchPage = useCallback(async () => {
     try {
@@ -196,7 +220,7 @@ export default function PageDetailView({
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <SpinnerGap className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -204,7 +228,7 @@ export default function PageDetailView({
   if (!data) {
     return (
       <Alert variant="destructive">
-        <AlertCircle className="h-5 w-5" />
+        <WarningCircle className="h-5 w-5" />
         <AlertDescription className="font-medium">Page not found</AlertDescription>
       </Alert>
     );
@@ -221,14 +245,14 @@ export default function PageDetailView({
         <Link href="/projects" className="hover:text-foreground transition-colors">
           Projects
         </Link>
-        <ChevronRight className="h-4 w-4 mx-2" />
+        <CaretRight className="h-4 w-4 mx-2" />
         <Link
           href={`/projects/${projectId}`}
           className="hover:text-foreground transition-colors"
         >
           {project?.name || "Project"}
         </Link>
-        <ChevronRight className="h-4 w-4 mx-2" />
+        <CaretRight className="h-4 w-4 mx-2" />
         <span className="text-foreground font-medium truncate max-w-[200px]">
           {page.title || "Untitled Page"}
         </span>
@@ -240,7 +264,7 @@ export default function PageDetailView({
           <h1 className="text-2xl font-bold tracking-tight truncate">
             {page.title || "Untitled Page"}
           </h1>
-          <Badge variant="secondary">{formatVersionDate(page.createdAt)}</Badge>
+          <Badge variant="secondary">{formatDate(page.createdAt)}</Badge>
           <div className="flex items-center gap-2">
             <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
             <a
@@ -250,29 +274,62 @@ export default function PageDetailView({
               className="text-blue-600 hover:underline flex items-center gap-1 truncate"
             >
               {page.url}
-              <ExternalLink className="h-3 w-3 shrink-0" />
+              <ArrowSquareOut className="h-3 w-3 shrink-0" />
             </a>
           </div>
         </div>
-        <Button
-          onClick={handleRescrape}
-          disabled={rescraping}
-          variant="outline"
-          className="shrink-0"
-        >
-          {rescraping ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4 mr-2" />
-          )}
-          {rescraping ? "Scraping..." : "Scrape Again"}
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            onClick={handleToggleArchive}
+            disabled={archiving}
+            variant="ghost"
+            size="sm"
+          >
+            {archiving ? (
+              <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
+            ) : page.archived === 1 ? (
+              <ArrowCounterClockwise className="h-4 w-4 mr-2" />
+            ) : (
+              <Archive className="h-4 w-4 mr-2" />
+            )}
+            {archiving ? "Updating..." : page.archived === 1 ? "Restore" : "Archive"}
+          </Button>
+          <Button
+            onClick={handleRescrape}
+            disabled={rescraping}
+            variant="outline"
+            className="shrink-0"
+          >
+            {rescraping ? (
+              <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <ArrowsClockwise className="h-4 w-4 mr-2" />
+            )}
+            {rescraping ? "Scraping..." : "Scrape Again"}
+          </Button>
+        </div>
       </div>
 
       {error && (
         <Alert variant="destructive">
-          <AlertCircle className="h-5 w-5" />
+          <WarningCircle className="h-5 w-5" />
           <AlertDescription className="font-medium">{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {page.archived === 1 && (
+        <Alert>
+          <Archive className="h-5 w-5" />
+          <AlertDescription>
+            This page is archived. It won&apos;t appear in the project overview.{" "}
+            <button
+              className="underline font-medium hover:text-foreground"
+              onClick={handleToggleArchive}
+              disabled={archiving}
+            >
+              Restore it
+            </button>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -281,7 +338,7 @@ export default function PageDetailView({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
+              <ClockCounterClockwise className="h-5 w-5" />
               Version History
             </CardTitle>
             <CardDescription>
@@ -293,12 +350,12 @@ export default function PageDetailView({
               {/* Current version */}
               <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10 border border-primary/20">
                 <div className="flex items-center gap-3">
-                  <Badge>{formatVersionDate(page.createdAt)}</Badge>
+                  <Badge>{formatDate(page.createdAt)}</Badge>
                   <div>
                     <p className="font-medium text-sm">{page.title || "Untitled"}</p>
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {new Date(page.createdAt).toLocaleString()}
+                      {formatDate(page.createdAt)}
                     </p>
                   </div>
                 </div>
@@ -312,7 +369,7 @@ export default function PageDetailView({
                   className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <Badge variant="outline">{formatVersionDate(version.createdAt)}</Badge>
+                    <Badge variant="outline">{formatDate(version.createdAt)}</Badge>
                     <div>
                       <p className="font-medium text-sm">{version.title || "Untitled"}</p>
                     </div>
@@ -334,9 +391,9 @@ export default function PageDetailView({
                       className="text-muted-foreground hover:text-destructive"
                     >
                       {deletingVersionId === version.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <SpinnerGap className="h-4 w-4 animate-spin" />
                       ) : (
-                        <Trash2 className="h-4 w-4" />
+                        <Trash className="h-4 w-4" />
                       )}
                     </Button>
                   </div>
@@ -366,7 +423,7 @@ export default function PageDetailView({
                 size="sm"
               >
                 {capturingFullPage ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <Camera className="h-4 w-4 mr-2" />
                 )}
@@ -394,7 +451,7 @@ export default function PageDetailView({
                       />
                     </div>
                     <div className="p-2 bg-muted/50 text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-                      <Maximize2 className="h-3 w-3" />
+                      <ArrowsOut className="h-3 w-3" />
                       Click to expand
                     </div>
                   </button>
@@ -426,7 +483,7 @@ export default function PageDetailView({
                       />
                     </div>
                     <div className="p-2 bg-muted/50 text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-                      <Maximize2 className="h-3 w-3" />
+                      <ArrowsOut className="h-3 w-3" />
                       Click to expand
                     </div>
                   </button>
@@ -458,8 +515,8 @@ export default function PageDetailView({
                 Scraped On
               </p>
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">{new Date(page.createdAt).toLocaleString()}</span>
+                <CalendarBlank className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">{formatDate(page.createdAt)}</span>
               </div>
             </div>
 
@@ -502,7 +559,7 @@ export default function PageDetailView({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Tags className="h-5 w-5" />
+              <TagIcon className="h-5 w-5" />
               Metadata
             </CardTitle>
             <CardDescription>
@@ -538,13 +595,30 @@ export default function PageDetailView({
       {page.content && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Page Content
-            </CardTitle>
-            <CardDescription>
-              Extracted markdown content from the page
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Page Content
+                </CardTitle>
+                <CardDescription>
+                  Extracted markdown content from the page
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleCopy(page.content!, "content")}
+                title="Copy content"
+              >
+                {copiedField === "content" ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="rounded-lg border bg-muted/30 p-4 max-h-[500px] overflow-auto">
@@ -582,7 +656,7 @@ export default function PageDetailView({
                     </div>
                     {product.price && (
                       <div className="flex items-center gap-1 shrink-0 text-lg font-bold">
-                        <DollarSign className="h-4 w-4" />
+                        <CurrencyDollar className="h-4 w-4" />
                         {product.price.replace(/^\$/, "")}
                         {product.currency && product.currency !== "USD" && (
                           <span className="text-xs font-normal text-muted-foreground ml-1">{product.currency}</span>
@@ -629,7 +703,7 @@ export default function PageDetailView({
                   {product.variants && product.variants.length > 0 && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-1.5">
-                        <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Stack className="h-3.5 w-3.5 text-muted-foreground" />
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                           Variants
                         </p>
@@ -706,7 +780,7 @@ export default function PageDetailView({
                   {/* Extracted date */}
                   <div className="flex items-center justify-between pt-2 border-t">
                     <p className="text-xs text-muted-foreground">
-                      Extracted {new Date(product.createdAt).toLocaleDateString()}
+                      Extracted {formatDate(product.createdAt)}
                     </p>
                     <button
                       type="button"
@@ -715,7 +789,7 @@ export default function PageDetailView({
                     >
                       <Code className="h-3 w-3" />
                       {expandedProductId === product.id ? "Hide" : "View"} JSON
-                      <ChevronDown className={`h-3 w-3 transition-transform ${expandedProductId === product.id ? "rotate-180" : ""}`} />
+                      <CaretDown className={`h-3 w-3 transition-transform ${expandedProductId === product.id ? "rotate-180" : ""}`} />
                     </button>
                   </div>
                 </div>
@@ -738,11 +812,28 @@ export default function PageDetailView({
       {metadata && Object.keys(metadata).length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Code className="h-5 w-5" />
-              Raw Metadata
-            </CardTitle>
-            <CardDescription>Complete metadata object as JSON</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Code className="h-5 w-5" />
+                  Raw Metadata
+                </CardTitle>
+                <CardDescription>Complete metadata object as JSON</CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleCopy(JSON.stringify(metadata, null, 2), "metadata")}
+                title="Copy metadata"
+              >
+                {copiedField === "metadata" ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="rounded-lg border bg-muted/30 p-4 max-h-[300px] overflow-auto">
@@ -794,11 +885,11 @@ export default function PageDetailView({
           >
             <div className="sticky top-0 bg-background border-b p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Badge variant="outline">{formatVersionDate(selectedVersion.createdAt)}</Badge>
+                <Badge variant="outline">{formatDate(selectedVersion.createdAt)}</Badge>
                 <div>
                   <h2 className="font-semibold">{selectedVersion.title || "Untitled"}</h2>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(selectedVersion.createdAt).toLocaleString()}
+                    {formatDate(selectedVersion.createdAt)}
                   </p>
                 </div>
               </div>

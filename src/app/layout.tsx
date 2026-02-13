@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
-import { Globe, FolderKanban, AlertCircle } from "lucide-react";
+import { Globe, Kanban, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
+const ibmPlexMono = IBM_Plex_Mono({
+  weight: ["400", "600"],
+  subsets: ["latin"],
+  variable: "--font-ibm-plex-mono",
+});
 
 export const metadata: Metadata = {
   title: "Website Analyzer - Marketing Strategy Tool",
@@ -20,7 +25,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${inter.className} ${ibmPlexMono.variable}`}>
         <div className="min-h-screen bg-background">
           <nav className="bg-card">
             <div className="container mx-auto px-4">
@@ -34,14 +39,14 @@ export default function RootLayout({
                     href="/projects"
                     className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <FolderKanban className="h-4 w-4" />
+                    <Kanban className="h-4 w-4" />
                     Projects
                   </Link>
                   <Link
                     href="/error-logs"
                     className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <AlertCircle className="h-4 w-4" />
+                    <WarningCircle className="h-4 w-4" />
                     Error Logs
                   </Link>
                 </div>

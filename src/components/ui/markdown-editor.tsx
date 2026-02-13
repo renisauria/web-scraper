@@ -5,19 +5,20 @@ import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "tiptap-markdown";
 import { useEffect, useRef } from "react";
 import {
-  Bold,
-  Italic,
-  Heading2,
-  Heading3,
+  TextB,
+  TextItalic,
+  TextHTwo,
+  TextHThree,
   List,
-  ListOrdered,
-} from "lucide-react";
+  ListNumbers,
+} from "@phosphor-icons/react";
 
 interface MarkdownEditorProps {
   value: string;
   onChange: (md: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  chromeless?: boolean;
 }
 
 export function MarkdownEditor({
@@ -25,6 +26,7 @@ export function MarkdownEditor({
   onChange,
   placeholder = "Start typing...",
   disabled = false,
+  chromeless = false,
 }: MarkdownEditorProps) {
   const isUpdatingRef = useRef(false);
 
@@ -70,15 +72,15 @@ export function MarkdownEditor({
   if (!editor) return null;
 
   return (
-    <div className="rounded-md border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-      <div className="flex items-center gap-0.5 border-b px-2 py-1">
+    <div className={chromeless ? "h-full flex flex-col" : "rounded-md border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"}>
+      <div className={chromeless ? "flex items-center gap-0.5 border-b px-2 py-1 shrink-0" : "flex items-center gap-0.5 border-b px-2 py-1"}>
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleBold().run()}
           active={editor.isActive("bold")}
           disabled={disabled}
           title="Bold"
         >
-          <Bold className="h-4 w-4" />
+          <TextB className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleItalic().run()}
@@ -86,7 +88,7 @@ export function MarkdownEditor({
           disabled={disabled}
           title="Italic"
         >
-          <Italic className="h-4 w-4" />
+          <TextItalic className="h-4 w-4" />
         </ToolbarButton>
         <div className="w-px h-4 bg-border mx-1" />
         <ToolbarButton
@@ -97,7 +99,7 @@ export function MarkdownEditor({
           disabled={disabled}
           title="Heading 2"
         >
-          <Heading2 className="h-4 w-4" />
+          <TextHTwo className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
           onClick={() =>
@@ -107,7 +109,7 @@ export function MarkdownEditor({
           disabled={disabled}
           title="Heading 3"
         >
-          <Heading3 className="h-4 w-4" />
+          <TextHThree className="h-4 w-4" />
         </ToolbarButton>
         <div className="w-px h-4 bg-border mx-1" />
         <ToolbarButton
@@ -124,10 +126,10 @@ export function MarkdownEditor({
           disabled={disabled}
           title="Ordered List"
         >
-          <ListOrdered className="h-4 w-4" />
+          <ListNumbers className="h-4 w-4" />
         </ToolbarButton>
       </div>
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} className={chromeless ? "flex-1 overflow-auto" : undefined} />
     </div>
   );
 }

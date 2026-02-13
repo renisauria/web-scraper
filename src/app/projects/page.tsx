@@ -15,13 +15,15 @@ import { Input } from "@/components/ui/input";
 import {
   Plus,
   Globe,
-  Search,
-  Calendar,
-  ExternalLink,
-  Trash2,
-} from "lucide-react";
+  MagnifyingGlass,
+  CalendarBlank,
+  ArrowSquareOut,
+  Trash,
+  ClockCounterClockwise,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { Project } from "@/types";
+import { formatDate } from "@/lib/format-date";
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -83,7 +85,7 @@ export default function ProjectsPage() {
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <MagnifyingGlass className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search projects..."
             value={search}
@@ -149,14 +151,17 @@ export default function ProjectsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <ExternalLink className="h-3 w-3" />
+                    <ArrowSquareOut className="h-3 w-3" />
                     <span className="truncate">{project.url}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
-                    <Calendar className="h-3 w-3" />
-                    <span>
-                      {new Date(project.createdAt).toLocaleDateString()}
-                    </span>
+                  <div className="shrink-0 bg-border h-[1px] w-full mt-2" />
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                    <CalendarBlank className="h-3 w-3" />
+                    <span>Created {formatDate(project.createdAt)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                    <ClockCounterClockwise className="h-3 w-3" />
+                    <span>Last updated {formatDate(project.updatedAt)}</span>
                   </div>
                 </CardContent>
               </Link>
@@ -169,7 +174,7 @@ export default function ProjectsPage() {
                   deleteProject(project.id);
                 }}
               >
-                <Trash2 className="h-4 w-4 text-destructive" />
+                <Trash className="h-4 w-4 text-destructive" />
               </Button>
             </Card>
           ))}

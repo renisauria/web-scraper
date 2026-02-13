@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Trash2, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
+import { WarningCircle, Trash, ArrowsClockwise, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { formatDate } from "@/lib/format-date";
 
 interface ErrorLog {
   id: string;
@@ -81,7 +82,7 @@ export default function ErrorLogsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <AlertCircle className="h-6 w-6 text-destructive" />
+          <WarningCircle className="h-6 w-6 text-destructive" />
           <h1 className="text-2xl font-bold">Error Logs</h1>
           {!loading && (
             <Badge variant="secondary">{logs.length} {logs.length === 1 ? "entry" : "entries"}</Badge>
@@ -89,7 +90,7 @@ export default function ErrorLogsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            <ArrowsClockwise className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           <Button
@@ -98,7 +99,7 @@ export default function ErrorLogsPage() {
             onClick={clearLogs}
             disabled={clearing || logs.length === 0}
           >
-            <Trash2 className="h-4 w-4 mr-2" />
+            <Trash className="h-4 w-4 mr-2" />
             Clear All Logs
           </Button>
         </div>
@@ -113,7 +114,7 @@ export default function ErrorLogsPage() {
       ) : logs.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            <AlertCircle className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <WarningCircle className="h-10 w-10 mx-auto mb-3 opacity-30" />
             <p className="text-lg font-medium">No error logs</p>
             <p className="text-sm mt-1">Errors from API routes will appear here.</p>
           </CardContent>
@@ -131,7 +132,7 @@ export default function ErrorLogsPage() {
                 >
                   <div className="flex items-center gap-3">
                     {hasDetails ? (
-                      expanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />
+                      expanded ? <CaretDown className="h-4 w-4 shrink-0" /> : <CaretRight className="h-4 w-4 shrink-0" />
                     ) : (
                       <div className="w-4" />
                     )}
@@ -141,7 +142,7 @@ export default function ErrorLogsPage() {
                     <code className="text-sm text-muted-foreground">{log.route}</code>
                     <span className="text-sm flex-1 truncate">{log.message}</span>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(log.createdAt).toLocaleString()}
+                      {formatDate(log.createdAt)}
                     </span>
                   </div>
                 </CardHeader>

@@ -22,38 +22,37 @@ import {
   Play,
   Brain,
   FileText,
-  ExternalLink,
-  Loader2,
+  ArrowSquareOut,
+  SpinnerGap,
   CheckCircle,
-  AlertCircle,
-  Calendar,
+  WarningCircle,
+  Warning,
+  CalendarBlank,
   FileCode,
   Image as ImageIcon,
   Plus,
   Link as LinkIcon,
-  Map,
-  Pencil,
+  MapTrifold,
+  PencilSimple,
   X,
-  Save,
-  MessageSquare,
-  Target,
-  RefreshCw,
-  Trash2,
-  Upload,
-  ClipboardList,
-  StickyNote,
-  Wand2,
-  Sparkles,
-  BookmarkPlus,
-  BookMarked,
-  ChevronDown,
-  ChevronRight,
-  Palette,
+  FloppyDisk,
+  Chat,
+  Crosshair,
+  ArrowsClockwise,
+  Trash,
+  UploadSimple,
+  ClipboardText,
+  Note,
+  MagicWand,
+  Sparkle,
+  BookmarkSimple,
+  CaretDown,
+  CaretRight,
   ShoppingBag,
   Package,
-  Download,
-  LayoutGrid,
-  ListTree,
+  DownloadSimple,
+  GridFour,
+  TreeStructure,
   Circle,
   ThumbsUp,
   ThumbsDown,
@@ -61,11 +60,20 @@ import {
   Monitor,
   Copy,
   Check,
-} from "lucide-react";
+  Buildings,
+  ChartBar,
+  CodeBlock,
+  Lightning,
+  Lightbulb,
+  ArrowRight,
+  Archive,
+  ArrowCounterClockwise,
+  ClockCounterClockwise,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
-import type { Project, Page, Analysis, Competitor, CompetitorType, ScreenshotLabel, Mockup, SavedPrompt, DesignKit, Product, ReferenceImage } from "@/types";
+import type { Project, Page, Analysis, Competitor, CompetitorType, ScreenshotLabel, Mockup, SavedPrompt, Product, ReferenceImage } from "@/types";
 import { normalizeReferenceImages } from "@/types";
-import { parseDesignTokens } from "@/lib/design-tokens";
+import { formatDate, formatDateShort } from "@/lib/format-date";
 import {
   Dialog,
   DialogContent,
@@ -83,7 +91,6 @@ interface ProjectData {
   competitors: Competitor[];
   mockups: Mockup[];
   savedPrompts: SavedPrompt[];
-  designKit: DesignKit | null;
   products: Product[];
 }
 
@@ -107,6 +114,8 @@ export default function ProjectDetailPage({
   const [editingContext, setEditingContext] = useState(false);
   const [contextForm, setContextForm] = useState({ clientProblems: "", competitorAnalysis: "", projectRequirements: "", clientNotes: "" });
   const [savingContext, setSavingContext] = useState(false);
+  const [expandedContextSections, setExpandedContextSections] = useState<Set<string>>(new Set());
+  const [activeContextTab, setActiveContextTab] = useState<string | null>(null);
   const [addingCompetitor, setAddingCompetitor] = useState(false);
   const [competitorForm, setCompetitorForm] = useState({ name: "", url: "", type: "competitor" as CompetitorType, preferredFeature: "", preferredFeatureUrl: "", notes: "", screenshotLabel: null as ScreenshotLabel | null });
   const [savingCompetitor, setSavingCompetitor] = useState(false);
@@ -139,10 +148,6 @@ export default function ProjectDetailPage({
   const [renamingPromptId, setRenamingPromptId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [viewingPromptLog, setViewingPromptLog] = useState<Mockup | null>(null);
-  const [uploadingDesignKit, setUploadingDesignKit] = useState(false);
-  const [designKitTab, setDesignKitTab] = useState<"colors" | "typography" | "spacing" | "other">("colors");
-  const [editingTokenPath, setEditingTokenPath] = useState<string | null>(null);
-  const [editingTokenValue, setEditingTokenValue] = useState("");
   const [extractingProducts, setExtractingProducts] = useState<string | null>(null);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [productView, setProductView] = useState<"grid" | "tree">("grid");
@@ -153,6 +158,26 @@ export default function ProjectDetailPage({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [selectedProductImageUrls, setSelectedProductImageUrls] = useState<string[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivingPageId, setArchivingPageId] = useState<string | null>(null);
+
+  async function handleArchivePage(pageId: string, archived: number) {
+    setArchivingPageId(pageId);
+    try {
+      const res = await fetch(`/api/pages/${pageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived }),
+      });
+      if (!res.ok) throw new Error("Failed to update page");
+      await fetchProject();
+      toast.success(archived ? "Page archived" : "Page restored");
+    } catch {
+      toast.error("Failed to update page");
+    } finally {
+      setArchivingPageId(null);
+    }
+  }
 
   const fetchProject = useCallback(async () => {
     try {
@@ -848,7 +873,7 @@ export default function ProjectDetailPage({
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <SpinnerGap className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -856,13 +881,13 @@ export default function ProjectDetailPage({
   if (!data) {
     return (
       <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
+        <WarningCircle className="h-4 w-4" />
         <AlertDescription>Project not found</AlertDescription>
       </Alert>
     );
   }
 
-  const { project, pages, analyses, competitors, mockups, savedPrompts, designKit, products } = data;
+  const { project, pages, analyses, competitors, mockups, savedPrompts, products } = data;
 
   // Sort pages: homepage first, then by URL depth and alphabetically
   const sortedPages = [...pages].sort((a, b) => {
@@ -912,8 +937,17 @@ export default function ProjectDetailPage({
     return a.url.localeCompare(b.url);
   });
 
+  const archivedCount = pages.filter((p) => p.archived === 1).length;
+  const visiblePages = showArchived
+    ? sortedPages
+    : sortedPages.filter((p) => p.archived !== 1);
+
   const hasScrapedData = pages.length > 0;
   const hasAnalyses = analyses.length > 0;
+
+  // Get homepage metadata for client information
+  const homePage = sortedPages[0] || null;
+  const homeMeta = (homePage?.metadata as Record<string, unknown> | null) || null;
 
   return (
     <>
@@ -972,7 +1006,7 @@ export default function ProjectDetailPage({
                               : "text-muted-foreground hover:bg-muted hover:text-foreground"
                           }`}
                         >
-                          <Target className={`h-3.5 w-3.5 mr-1.5 ${competitorEditForm.type === "competitor" ? "text-foreground" : ""}`} />
+                          <Crosshair className={`h-3.5 w-3.5 mr-1.5 ${competitorEditForm.type === "competitor" ? "text-foreground" : ""}`} />
                           Competitor
                         </button>
                         <button
@@ -985,7 +1019,7 @@ export default function ProjectDetailPage({
                               : "text-muted-foreground hover:bg-muted hover:text-foreground"
                           }`}
                         >
-                          <Sparkles className={`h-3.5 w-3.5 mr-1.5 ${competitorEditForm.type === "inspiration" ? "text-violet-600" : ""}`} />
+                          <Sparkle className={`h-3.5 w-3.5 mr-1.5 ${competitorEditForm.type === "inspiration" ? "text-violet-600" : ""}`} />
                           Inspiration
                         </button>
                       </div>
@@ -1089,7 +1123,7 @@ export default function ProjectDetailPage({
                               <div className="flex gap-1">
                                 <button
                                   type="button"
-                                  className={`px-1.5 py-0.5 text-[10px] rounded font-medium transition-colors ${img.tag === "emulate" ? "bg-green-100 text-green-700 ring-1 ring-green-400" : "bg-muted text-muted-foreground hover:bg-green-50 hover:text-green-700"}`}
+                                  className={`px-1.5 py-0.5 text-[10px] rounded font-medium uppercase font-[family-name:var(--font-ibm-plex-mono)] transition-colors ${img.tag === "emulate" ? "bg-green-100 text-green-700 ring-1 ring-green-400" : "bg-muted text-muted-foreground hover:bg-green-50 hover:text-green-700"}`}
                                   onClick={() =>
                                     setEditReferenceImages((prev) => prev.map((r, j) => j === i ? { ...r, tag: r.tag === "emulate" ? null : "emulate" } : r))
                                   }
@@ -1099,7 +1133,7 @@ export default function ProjectDetailPage({
                                 </button>
                                 <button
                                   type="button"
-                                  className={`px-1.5 py-0.5 text-[10px] rounded font-medium transition-colors ${img.tag === "avoid" ? "bg-red-100 text-red-700 ring-1 ring-red-400" : "bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-700"}`}
+                                  className={`px-1.5 py-0.5 text-[10px] rounded font-medium uppercase font-[family-name:var(--font-ibm-plex-mono)] transition-colors ${img.tag === "avoid" ? "bg-red-100 text-red-700 ring-1 ring-red-400" : "bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-700"}`}
                                   onClick={() =>
                                     setEditReferenceImages((prev) => prev.map((r, j) => j === i ? { ...r, tag: r.tag === "avoid" ? null : "avoid" } : r))
                                   }
@@ -1113,7 +1147,7 @@ export default function ProjectDetailPage({
                         </div>
                       )}
                       <label className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm cursor-pointer hover:bg-muted/50 transition-colors w-fit">
-                        <Upload className="h-4 w-4 text-muted-foreground" />
+                        <UploadSimple className="h-4 w-4 text-muted-foreground" />
                         <span>Upload images</span>
                         <input
                           type="file"
@@ -1142,9 +1176,9 @@ export default function ProjectDetailPage({
                       disabled={!competitorEditForm.name.trim() || !competitorEditForm.url.trim() || savingCompetitorEdit}
                     >
                       {savingCompetitorEdit ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
                       ) : (
-                        <Save className="h-4 w-4 mr-2" />
+                        <FloppyDisk className="h-4 w-4 mr-2" />
                       )}
                       Save Changes
                     </Button>
@@ -1180,7 +1214,7 @@ export default function ProjectDetailPage({
                         className="text-sm text-blue-600 hover:underline flex items-center gap-1"
                       >
                         {viewingCompetitor.url}
-                        <ExternalLink className="h-3 w-3" />
+                        <ArrowSquareOut className="h-3 w-3" />
                       </a>
                     </div>
                     <div className="flex items-center gap-1">
@@ -1190,7 +1224,7 @@ export default function ProjectDetailPage({
                         onClick={startEditingCompetitor}
                         title="Edit"
                       >
-                        <Pencil className="h-4 w-4" />
+                        <PencilSimple className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -1213,7 +1247,7 @@ export default function ProjectDetailPage({
                           className="text-sm text-blue-600 hover:underline flex items-center gap-1"
                         >
                           {viewingCompetitor.preferredFeature}
-                          <ExternalLink className="h-3 w-3" />
+                          <ArrowSquareOut className="h-3 w-3" />
                         </a>
                       ) : (
                         <p className="text-sm text-muted-foreground">{viewingCompetitor.preferredFeature}</p>
@@ -1246,7 +1280,7 @@ export default function ProjectDetailPage({
                               />
                             </button>
                             {img.tag && (
-                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${img.tag === "emulate" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                              <span className={`text-[10px] font-medium uppercase font-[family-name:var(--font-ibm-plex-mono)] px-1.5 py-0.5 rounded ${img.tag === "emulate" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                                 {img.tag === "emulate" ? "Emulate" : "Avoid"}
                               </span>
                             )}
@@ -1295,9 +1329,9 @@ export default function ProjectDetailPage({
                       disabled={capturingCompetitorId === viewingCompetitor.id}
                     >
                       {capturingCompetitorId === viewingCompetitor.id ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
                       ) : (
-                        <RefreshCw className="h-4 w-4 mr-2" />
+                        <ArrowsClockwise className="h-4 w-4 mr-2" />
                       )}
                       Recapture Screenshot
                     </Button>
@@ -1311,7 +1345,7 @@ export default function ProjectDetailPage({
                         setEditingCompetitor(false);
                       }}
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
+                      <Trash className="h-4 w-4 mr-2" />
                       Delete
                     </Button>
                   </div>
@@ -1368,67 +1402,12 @@ export default function ProjectDetailPage({
               <p className="text-muted-foreground">{project.clientName}</p>
             )}
           </div>
-
-          {/* Logo upload/preview */}
-          <div className="ml-4">
-            {project.logo ? (
-              <div className="group relative">
-                <img
-                  src={project.logo}
-                  alt="Brand logo"
-                  className="h-10 w-auto max-w-[120px] object-contain rounded border bg-gray-100 p-1"
-                />
-                <div className="absolute inset-0 bg-black/60 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                  <label className="cursor-pointer p-1 hover:bg-white/20 rounded" title="Replace logo">
-                    <RefreshCw className="h-3.5 w-3.5 text-white" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleLogoUpload(file);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                  <button
-                    onClick={handleLogoRemove}
-                    className="p-1 hover:bg-white/20 rounded"
-                    title="Remove logo"
-                  >
-                    <X className="h-3.5 w-3.5 text-white" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-dashed border-muted-foreground/40 hover:border-muted-foreground/70 hover:bg-muted/50 transition-colors text-xs text-muted-foreground">
-                {uploadingLogo ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Upload className="h-3.5 w-3.5" />
-                )}
-                {uploadingLogo ? "Uploading..." : "Logo"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={uploadingLogo}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleLogoUpload(file);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-            )}
-          </div>
         </div>
         <div className="flex items-center gap-2">
           {hasScrapedData && (
             <Link href={`/projects/${id}/sitemap`}>
               <Button variant="outline">
-                <Map className="h-4 w-4 mr-2" />
+                <MapTrifold className="h-4 w-4 mr-2" />
                 Sitemap
               </Button>
             </Link>
@@ -1454,7 +1433,7 @@ export default function ProjectDetailPage({
 
       {error && (
         <Alert variant="destructive">
-          <AlertCircle className="h-5 w-5" />
+          <WarningCircle className="h-5 w-5" />
           <AlertDescription className="font-medium">{error}</AlertDescription>
         </Alert>
       )}
@@ -1462,7 +1441,63 @@ export default function ProjectDetailPage({
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Project Overview</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Project Overview</CardTitle>
+              {/* Logo upload/preview */}
+              <div>
+                {project.logo ? (
+                  <div className="group relative">
+                    <img
+                      src={project.logo}
+                      alt="Brand logo"
+                      className="h-10 w-auto max-w-[120px] object-contain rounded-lg bg-muted p-1"
+                    />
+                    <div className="absolute inset-0 bg-black/60 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                      <label className="cursor-pointer p-1 hover:bg-white/20 rounded" title="Replace logo">
+                        <ArrowsClockwise className="h-3.5 w-3.5 text-white" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleLogoUpload(file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                      <button
+                        onClick={handleLogoRemove}
+                        className="p-1 hover:bg-white/20 rounded"
+                        title="Remove logo"
+                      >
+                        <X className="h-3.5 w-3.5 text-white" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-dashed border-muted-foreground/40 hover:border-muted-foreground/70 hover:bg-muted/50 transition-colors text-xs text-muted-foreground">
+                    {uploadingLogo ? (
+                      <SpinnerGap className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <UploadSimple className="h-3.5 w-3.5" />
+                    )}
+                    {uploadingLogo ? "Uploading..." : "Logo"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingLogo}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleLogoUpload(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2">
@@ -1474,13 +1509,60 @@ export default function ProjectDetailPage({
                 className="text-blue-600 hover:underline flex items-center gap-1"
               >
                 {project.url}
-                <ExternalLink className="h-3 w-3" />
+                <ArrowSquareOut className="h-3 w-3" />
               </a>
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              Created {new Date(project.createdAt).toLocaleDateString()}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+              <CalendarBlank className="h-3.5 w-3.5" />
+              <span>Created {formatDate(project.createdAt)}</span>
+              <span className="h-3 border-l-2 border-dotted border-primary/30" />
+              <ClockCounterClockwise className="h-3.5 w-3.5" />
+              <span>Last updated {formatDate(project.updatedAt)}</span>
             </div>
+
+            {/* Client Information */}
+            {homeMeta && (!!homeMeta.title || !!homeMeta.description || !!homeMeta.language || !!homeMeta.ogImage) && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Buildings className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium text-sm">Client Information</span>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    {!!homeMeta.title && (
+                      <div>
+                        <span className="text-muted-foreground">Site Title</span>
+                        <p>{String(homeMeta.title)}</p>
+                      </div>
+                    )}
+                    {!!homeMeta.description && (
+                      <div>
+                        <span className="text-muted-foreground">Description</span>
+                        <p>{String(homeMeta.description)}</p>
+                      </div>
+                    )}
+                    {!!homeMeta.language && (
+                      <div>
+                        <span className="text-muted-foreground">Language</span>
+                        <div><Badge variant="secondary">{String(homeMeta.language)}</Badge></div>
+                      </div>
+                    )}
+                    {!!homeMeta.ogImage && (
+                      <div>
+                        <span className="text-muted-foreground">OG Image</span>
+                        <img
+                          src={String(homeMeta.ogImage)}
+                          alt="Open Graph"
+                          className="mt-1 w-full max-w-xs rounded-lg"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
             <Separator />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="p-4 rounded-lg bg-muted/50">
@@ -1519,7 +1601,7 @@ export default function ProjectDetailPage({
                     value={scrapeLimit}
                     onChange={(e) => setScrapeLimit(Number(e.target.value))}
                     disabled={scraping || analyzing || scrapingSingle}
-                    className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    className="w-full h-9 rounded-[8px] border border-input bg-background px-2 pr-8 text-sm"
                   >
                     <option value={10}>10 pages</option>
                     <option value={25}>25 pages</option>
@@ -1535,7 +1617,7 @@ export default function ProjectDetailPage({
                     value={scrapeDepth}
                     onChange={(e) => setScrapeDepth(Number(e.target.value))}
                     disabled={scraping || analyzing || scrapingSingle}
-                    className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    className="w-full h-9 rounded-[8px] border border-input bg-background px-2 pr-8 text-sm"
                   >
                     <option value={2}>2 levels</option>
                     <option value={3}>3 levels</option>
@@ -1551,7 +1633,7 @@ export default function ProjectDetailPage({
                 variant={hasScrapedData ? "outline" : "default"}
               >
                 {scraping ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <Play className="h-4 w-4 mr-2" />
                 )}
@@ -1617,7 +1699,7 @@ export default function ProjectDetailPage({
                   variant="outline"
                 >
                   {scrapingSingle ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <SpinnerGap className="h-4 w-4 animate-spin" />
                   ) : (
                     <Plus className="h-4 w-4" />
                   )}
@@ -1637,27 +1719,35 @@ export default function ProjectDetailPage({
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 AI Analysis
               </p>
-              <Button
-                onClick={startAnalysis}
-                disabled={!hasScrapedData || scraping || analyzing || scrapingSingle}
-                className="w-full"
-              >
-                {analyzing ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Brain className="h-4 w-4 mr-2" />
-                )}
-                {hasAnalyses ? "Re-analyze" : "Run AI Analysis"}
-              </Button>
               {analyzing ? (
-                <p className="text-xs text-muted-foreground">
-                  Analyzing content with AI... This may take a minute.
-                </p>
+                <>
+                  <Button disabled className="w-full">
+                    <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
+                    Analyzing...
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Analyzing content with AI... This may take a minute.
+                  </p>
+                </>
               ) : !hasScrapedData ? (
                 <p className="text-xs text-muted-foreground">
                   Scrape the website first to enable analysis
                 </p>
-              ) : null}
+              ) : hasAnalyses ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle className="h-4 w-4 text-emerald-500" />
+                  <span>Analysis complete</span>
+                </div>
+              ) : (
+                <Button
+                  onClick={startAnalysis}
+                  disabled={scraping || scrapingSingle}
+                  className="w-full"
+                >
+                  <Brain className="h-4 w-4 mr-2" />
+                  Run AI Analysis
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1683,7 +1773,7 @@ export default function ProjectDetailPage({
                 disabled={!hasScrapedData || detectingPlatform}
               >
                 {detectingPlatform ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <Monitor className="h-4 w-4 mr-2" />
                 )}
@@ -1719,7 +1809,7 @@ export default function ProjectDetailPage({
                 }>
                   {project.platformInfo.confidence} confidence
                 </Badge>
-                <Badge variant="outline" className="capitalize">
+                <Badge variant="outline">
                   {project.platformInfo.platform}
                 </Badge>
                 <Button
@@ -1731,9 +1821,9 @@ export default function ProjectDetailPage({
                   title="Re-detect platform"
                 >
                   {detectingPlatform ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <SpinnerGap className="h-4 w-4 animate-spin" />
                   ) : (
-                    <RefreshCw className="h-4 w-4" />
+                    <ArrowsClockwise className="h-4 w-4" />
                   )}
                 </Button>
               </div>
@@ -1833,7 +1923,7 @@ export default function ProjectDetailPage({
             )}
 
             <p className="text-xs text-muted-foreground">
-              Detected on {new Date(project.platformInfo.detectedAt).toLocaleDateString()}
+              Detected on {formatDate(project.platformInfo.detectedAt)}
             </p>
           </CardContent>
         </Card>
@@ -1845,7 +1935,7 @@ export default function ProjectDetailPage({
             <CardTitle>Client Context</CardTitle>
             {!editingContext && (
               <Button variant="ghost" size="icon" onClick={startEditingContext}>
-                <Pencil className="h-4 w-4" />
+                <PencilSimple className="h-4 w-4" />
               </Button>
             )}
           </div>
@@ -1855,134 +1945,137 @@ export default function ProjectDetailPage({
         </CardHeader>
         <CardContent>
           {editingContext ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Client Problems
-                </label>
-                <MarkdownEditor
-                  placeholder="Describe current challenges..."
-                  value={contextForm.clientProblems}
-                  onChange={(md) =>
-                    setContextForm({ ...contextForm, clientProblems: md })
-                  }
-                  disabled={savingContext}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  Competitor Analysis & Desired Features
-                </label>
-                <MarkdownEditor
-                  placeholder="Competitor insights, desired features, and functionality goals..."
-                  value={contextForm.competitorAnalysis}
-                  onChange={(md) =>
-                    setContextForm({ ...contextForm, competitorAnalysis: md })
-                  }
-                  disabled={savingContext}
-                />
-              </div>
-              <Separator />
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <ClipboardList className="h-4 w-4" />
-                  New Project Requirements
-                </label>
-                <MarkdownEditor
-                  placeholder="What does the new project need to include..."
-                  value={contextForm.projectRequirements}
-                  onChange={(md) =>
-                    setContextForm({ ...contextForm, projectRequirements: md })
-                  }
-                  disabled={savingContext}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <StickyNote className="h-4 w-4" />
-                  Additional Notes from the Client
-                </label>
-                <MarkdownEditor
-                  placeholder="Any other notes or context from the client..."
-                  value={contextForm.clientNotes}
-                  onChange={(md) =>
-                    setContextForm({ ...contextForm, clientNotes: md })
-                  }
-                  disabled={savingContext}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={saveContext} disabled={savingContext} size="sm">
-                  {savingContext ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  Save
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditingContext(false)}
-                  disabled={savingContext}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
-              </div>
-            </div>
+            (() => {
+              const editTabs = [
+                { key: "problems", label: "Problems", icon: Chat, color: "border-l-red-500", iconColor: "text-red-500 dark:text-red-400", field: "clientProblems" as const, placeholder: "Describe current challenges..." },
+                { key: "competitor", label: "Competitors", icon: Crosshair, color: "border-l-blue-800 dark:border-l-blue-400", iconColor: "text-blue-800 dark:text-blue-400", field: "competitorAnalysis" as const, placeholder: "Competitor insights, desired features..." },
+                { key: "requirements", label: "Requirements", icon: ClipboardText, color: "border-l-green-600 dark:border-l-green-400", iconColor: "text-green-600 dark:text-green-400", field: "projectRequirements" as const, placeholder: "What the new project needs..." },
+                { key: "notes", label: "Notes", icon: Note, color: "border-l-orange-500", iconColor: "text-orange-500 dark:text-orange-400", field: "clientNotes" as const, placeholder: "Other notes or context..." },
+              ];
+              const currentEditKey = activeContextTab || editTabs[0].key;
+              const activeEditTab = editTabs.find(t => t.key === currentEditKey) || editTabs[0];
+
+              return (
+                <div className="space-y-4">
+                  <div className="flex border rounded-xl overflow-hidden min-h-[300px]">
+                    <div className="flex flex-col shrink-0 border-r divide-y bg-background">
+                      {editTabs.map((tab) => {
+                        const isActive = activeEditTab.key === tab.key;
+                        return (
+                          <button
+                            key={tab.key}
+                            onClick={() => setActiveContextTab(tab.key)}
+                            className={`flex items-center gap-3 text-left text-sm transition-colors px-4 py-3 ${
+                              isActive
+                                ? `border-l-[3px] ${tab.color} font-medium text-foreground`
+                                : "border-l-[3px] border-l-transparent font-normal text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            <tab.icon
+                              className={`h-4 w-4 shrink-0 ${isActive ? tab.iconColor : "text-muted-foreground/50"}`}
+                            />
+                            <span className="whitespace-nowrap">{tab.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex-1 bg-muted/20 dark:bg-muted/10">
+                      <MarkdownEditor
+                        key={activeEditTab.key}
+                        placeholder={activeEditTab.placeholder}
+                        value={contextForm[activeEditTab.field]}
+                        onChange={(md) =>
+                          setContextForm({ ...contextForm, [activeEditTab.field]: md })
+                        }
+                        disabled={savingContext}
+                        chromeless
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={saveContext} disabled={savingContext} size="sm">
+                      {savingContext ? (
+                        <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <FloppyDisk className="h-4 w-4 mr-2" />
+                      )}
+                      Save
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingContext(false)}
+                      disabled={savingContext}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()
           ) : project.clientProblems || project.competitorAnalysis || project.projectRequirements || project.clientNotes ? (
-            <div className="space-y-5">
-              {project.clientProblems && (
-                <div className="rounded-lg border-l-[3px] border-l-rose-500 bg-rose-50/50 dark:bg-rose-950/20 p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <MessageSquare className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-                    <h3 className="text-[13px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">Problems</h3>
-                  </div>
-                  <div className="text-sm text-foreground/90">
-                    <MarkdownViewer content={project.clientProblems} />
-                  </div>
-                </div>
-              )}
+            (() => {
+              const contextTabs = [
+                project.clientProblems ? { key: "problems", label: "Problems", icon: Chat, color: "border-l-red-500", iconColor: "text-red-500 dark:text-red-400", content: project.clientProblems } : null,
+                project.competitorAnalysis ? { key: "competitor", label: "Competitors", icon: Crosshair, color: "border-l-blue-800 dark:border-l-blue-400", iconColor: "text-blue-800 dark:text-blue-400", content: project.competitorAnalysis } : null,
+                project.projectRequirements ? { key: "requirements", label: "Requirements", icon: ClipboardText, color: "border-l-green-600 dark:border-l-green-400", iconColor: "text-green-600 dark:text-green-400", content: project.projectRequirements } : null,
+                project.clientNotes ? { key: "notes", label: "Notes", icon: Note, color: "border-l-orange-500", iconColor: "text-orange-500 dark:text-orange-400", content: project.clientNotes } : null,
+              ].filter(Boolean) as { key: string; label: string; icon: React.ElementType; color: string; iconColor: string; content: string }[];
 
-              {project.competitorAnalysis && (
-                <div className="rounded-lg border-l-[3px] border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20 p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <h3 className="text-[13px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">Competitor Analysis & Desired Features</h3>
-                  </div>
-                  <div className="text-sm text-foreground/90">
-                    <MarkdownViewer content={project.competitorAnalysis} />
-                  </div>
-                </div>
-              )}
+              const currentActiveKey = activeContextTab || contextTabs[0]?.key;
+              const activeTab = contextTabs.find(t => t.key === currentActiveKey) || contextTabs[0];
 
-              {project.projectRequirements && (
-                <div className="rounded-lg border-l-[3px] border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <ClipboardList className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                    <h3 className="text-[13px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">New Project Requirements</h3>
+              return (
+                <div className="flex border rounded-xl overflow-hidden min-h-[200px]">
+                  <div className="flex flex-col shrink-0 border-r divide-y bg-background">
+                    {contextTabs.map((tab) => {
+                      const isActive = activeTab.key === tab.key;
+                      return (
+                        <button
+                          key={tab.key}
+                          onClick={() => setActiveContextTab(tab.key)}
+                          className={`flex items-center gap-3 text-left text-sm transition-colors px-4 py-3 ${
+                            isActive
+                              ? `border-l-[3px] ${tab.color} font-medium text-foreground`
+                              : "border-l-[3px] border-l-transparent font-normal text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <tab.icon
+                            className={`h-4 w-4 shrink-0 ${isActive ? tab.iconColor : "text-muted-foreground/50"}`}
+                          />
+                          <span className="whitespace-nowrap">{tab.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="text-sm text-foreground/90">
-                    <MarkdownViewer content={project.projectRequirements} />
-                  </div>
-                </div>
-              )}
 
-              {project.clientNotes && (
-                <div className="rounded-lg border-l-[3px] border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20 p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <StickyNote className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                    <h3 className="text-[13px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Additional Notes from the Client</h3>
-                  </div>
-                  <div className="text-sm text-foreground/90">
-                    <MarkdownViewer content={project.clientNotes} />
+                  <div className="flex-1 bg-muted/20 dark:bg-muted/10 overflow-auto relative">
+                    <div className="absolute top-2 right-2 z-10">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-background"
+                        onClick={() => {
+                          navigator.clipboard.writeText(activeTab.content);
+                          setCopiedField(`context-${activeTab.key}`);
+                          toast.success("Copied to clipboard");
+                          setTimeout(() => setCopiedField(null), 2000);
+                        }}
+                        title="Copy markdown"
+                      >
+                        {copiedField === `context-${activeTab.key}` ? (
+                          <Check className="h-3.5 w-3.5 text-green-500" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                    <pre className="p-6 text-sm text-foreground/90 leading-relaxed font-[family-name:var(--font-ibm-plex-mono)] font-normal whitespace-pre-wrap break-words">{activeTab.content}</pre>
                   </div>
                 </div>
-              )}
-            </div>
+              );
+            })()
           ) : (
             <button
               onClick={startEditingContext}
@@ -1993,6 +2086,65 @@ export default function ProjectDetailPage({
           )}
         </CardContent>
       </Card>
+
+      {analyses.length > 0 && (() => {
+        const latestAnalysis = new Date(Math.max(...analyses.map(a => new Date(a.createdAt).getTime())));
+        const analysisStale = project.contextUpdatedAt
+          && new Date(project.contextUpdatedAt) > latestAnalysis;
+        return (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Completed Analyses</CardTitle>
+                <Button
+                  onClick={startAnalysis}
+                  disabled={analyzing || scraping || scrapingSingle}
+                  size="sm"
+                >
+                  {analyzing ? (
+                    <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Brain className="h-4 w-4 mr-2" />
+                  )}
+                  Re-analyze
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {analysisStale && (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 text-sm text-amber-800 dark:text-amber-200">
+                  <Warning className="h-4 w-4 shrink-0" />
+                  Client context has been updated since the last analysis.
+                </div>
+              )}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {analyses.map((analysis) => {
+                  const colors: Record<string, string> = {
+                    marketing: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300",
+                    techstack: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300",
+                    architecture: "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300",
+                    performance: "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300",
+                    recommendations: "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300",
+                  };
+                  return (
+                    <Link
+                      key={analysis.id}
+                      href={`/projects/${id}/analysis?tab=${analysis.type}`}
+                      className={`group flex flex-col items-center gap-3 rounded-xl p-5 text-center transition-all hover:opacity-80 ${colors[analysis.type] || "bg-muted"}`}
+                    >
+                      <AnalysisIcon type={analysis.type} />
+                      <span className="text-sm font-semibold capitalize">{analysis.type === "techstack" ? "Tech Stack" : analysis.type}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Last analyzed {formatDate(latestAnalysis)}
+              </p>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <Card>
         <CardHeader>
@@ -2054,7 +2206,7 @@ export default function ProjectDetailPage({
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
-                    <Target className={`h-3.5 w-3.5 mr-1.5 ${competitorForm.type === "competitor" ? "text-foreground" : ""}`} />
+                    <Crosshair className={`h-3.5 w-3.5 mr-1.5 ${competitorForm.type === "competitor" ? "text-foreground" : ""}`} />
                     Competitor
                   </button>
                   <button
@@ -2067,7 +2219,7 @@ export default function ProjectDetailPage({
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
-                    <Sparkles className={`h-3.5 w-3.5 mr-1.5 ${competitorForm.type === "inspiration" ? "text-violet-600" : ""}`} />
+                    <Sparkle className={`h-3.5 w-3.5 mr-1.5 ${competitorForm.type === "inspiration" ? "text-violet-600" : ""}`} />
                     Inspiration
                   </button>
                 </div>
@@ -2142,7 +2294,7 @@ export default function ProjectDetailPage({
               <div className="space-y-2">
                 <label className="text-sm font-medium">Reference screenshots (optional)</label>
                 <label className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm cursor-pointer hover:bg-muted/50 transition-colors w-fit">
-                  <Upload className="h-4 w-4 text-muted-foreground" />
+                  <UploadSimple className="h-4 w-4 text-muted-foreground" />
                   <span>Upload images</span>
                   <input
                     type="file"
@@ -2186,7 +2338,7 @@ export default function ProjectDetailPage({
                         <div className="flex gap-1">
                           <button
                             type="button"
-                            className={`px-1.5 py-0.5 text-[10px] rounded font-medium transition-colors ${img.tag === "emulate" ? "bg-green-100 text-green-700 ring-1 ring-green-400" : "bg-muted text-muted-foreground hover:bg-green-50 hover:text-green-700"}`}
+                            className={`px-1.5 py-0.5 text-[10px] rounded font-medium uppercase font-[family-name:var(--font-ibm-plex-mono)] transition-colors ${img.tag === "emulate" ? "bg-green-100 text-green-700 ring-1 ring-green-400" : "bg-muted text-muted-foreground hover:bg-green-50 hover:text-green-700"}`}
                             onClick={() =>
                               setReferenceImages((prev) => prev.map((r, j) => j === i ? { ...r, tag: r.tag === "emulate" ? null : "emulate" } : r))
                             }
@@ -2195,7 +2347,7 @@ export default function ProjectDetailPage({
                           </button>
                           <button
                             type="button"
-                            className={`px-1.5 py-0.5 text-[10px] rounded font-medium transition-colors ${img.tag === "avoid" ? "bg-red-100 text-red-700 ring-1 ring-red-400" : "bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-700"}`}
+                            className={`px-1.5 py-0.5 text-[10px] rounded font-medium uppercase font-[family-name:var(--font-ibm-plex-mono)] transition-colors ${img.tag === "avoid" ? "bg-red-100 text-red-700 ring-1 ring-red-400" : "bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-700"}`}
                             onClick={() =>
                               setReferenceImages((prev) => prev.map((r, j) => j === i ? { ...r, tag: r.tag === "avoid" ? null : "avoid" } : r))
                             }
@@ -2234,7 +2386,7 @@ export default function ProjectDetailPage({
                   size="sm"
                 >
                   {savingCompetitor ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
                     <ImageIcon className="h-4 w-4 mr-2" />
                   )}
@@ -2314,290 +2466,6 @@ export default function ProjectDetailPage({
         </CardContent>
       </Card>
 
-      {/* Design Kit */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5" />
-                Design Kit
-              </CardTitle>
-              <CardDescription>
-                Import Figma design tokens (.tokens.json) so mockups use your exact brand colors, fonts, and spacing
-              </CardDescription>
-            </div>
-            {designKit && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-destructive hover:text-destructive"
-                onClick={async () => {
-                  try {
-                    const res = await fetch(`/api/design-kits/${designKit.id}`, { method: "DELETE" });
-                    if (!res.ok) throw new Error("Failed to delete design kit");
-                    await fetchProject();
-                    toast.success("Design kit removed");
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : "Failed to delete");
-                  }
-                }}
-                title="Remove design kit"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {designKit && designKit.tokens ? (() => {
-            let tokens = designKit.tokens as Record<string, unknown>;
-            if (typeof tokens === "string") {
-              try { tokens = JSON.parse(tokens); } catch { tokens = {}; }
-            }
-            const flatTokens = parseDesignTokens(tokens);
-            const colorTokens = flatTokens.filter(t => t.type === "color");
-            const typographyTokens = flatTokens.filter(t => ["typography", "fontFamily", "fontWeight", "fontSize", "lineHeight", "letterSpacing"].includes(t.type));
-            const spacingTokens = flatTokens.filter(t => ["dimension", "spacing", "sizing", "borderRadius", "borderWidth"].includes(t.type));
-            const otherTokens = flatTokens.filter(t => !["color", "typography", "fontFamily", "fontWeight", "fontSize", "lineHeight", "letterSpacing", "dimension", "spacing", "sizing", "borderRadius", "borderWidth"].includes(t.type));
-
-            const tabCounts = {
-              colors: colorTokens.length,
-              typography: typographyTokens.length,
-              spacing: spacingTokens.length,
-              other: otherTokens.length,
-            };
-
-            const currentTokens =
-              designKitTab === "colors" ? colorTokens :
-              designKitTab === "typography" ? typographyTokens :
-              designKitTab === "spacing" ? spacingTokens :
-              otherTokens;
-
-            return (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{designKit.fileName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {flatTokens.length} tokens ({colorTokens.length} colors, {typographyTokens.length} typography, {spacingTokens.length} spacing)
-                    </p>
-                  </div>
-                  <label className="cursor-pointer">
-                    <Button variant="outline" size="sm" asChild>
-                      <span>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Replace
-                      </span>
-                    </Button>
-                    <input
-                      type="file"
-                      accept=".json,.tokens.json"
-                      className="hidden"
-                      disabled={uploadingDesignKit}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        setUploadingDesignKit(true);
-                        try {
-                          const text = await file.text();
-                          const res = await fetch("/api/design-kits", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              projectId: id,
-                              fileName: file.name,
-                              tokensJson: text,
-                            }),
-                          });
-                          const result = await res.json();
-                          if (!res.ok) throw new Error(result.error || "Upload failed");
-                          await fetchProject();
-                          toast.success("Design kit replaced");
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Upload failed");
-                        } finally {
-                          setUploadingDesignKit(false);
-                          e.target.value = "";
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-
-                {/* Tabs */}
-                <div className="flex gap-1 border-b">
-                  {(["colors", "typography", "spacing", "other"] as const).map(tab => (
-                    <button
-                      key={tab}
-                      onClick={() => { setDesignKitTab(tab); setEditingTokenPath(null); }}
-                      className={`px-3 py-1.5 text-sm font-medium border-b-2 transition-colors ${
-                        designKitTab === tab
-                          ? "border-primary text-foreground"
-                          : "border-transparent text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                      {tabCounts[tab] > 0 && (
-                        <span className="ml-1.5 text-xs text-muted-foreground">({tabCounts[tab]})</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Token list */}
-                {currentTokens.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No {designKitTab} tokens found</p>
-                ) : (
-                  <div className="space-y-1 max-h-[400px] overflow-y-auto">
-                    {currentTokens.map(token => (
-                      <div key={token.path} className="flex items-center justify-between gap-3 py-1.5 px-2 rounded hover:bg-muted/50 group">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          {token.type === "color" && typeof token.rawValue === "string" && (
-                            <div
-                              className="h-6 w-6 rounded border flex-shrink-0"
-                              style={{ backgroundColor: token.rawValue }}
-                              title={token.rawValue}
-                            />
-                          )}
-                          <span className="text-sm font-mono text-muted-foreground truncate" title={token.path}>
-                            {token.path}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {editingTokenPath === token.path ? (
-                            <div className="flex items-center gap-1">
-                              <Input
-                                value={editingTokenValue}
-                                onChange={e => setEditingTokenValue(e.target.value)}
-                                className="h-7 w-32 text-xs"
-                                onKeyDown={async e => {
-                                  if (e.key === "Enter") {
-                                    try {
-                                      const res = await fetch(`/api/design-kits/${designKit.id}`, {
-                                        method: "PATCH",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({ path: token.path, value: editingTokenValue }),
-                                      });
-                                      if (!res.ok) throw new Error("Failed to save");
-                                      await fetchProject();
-                                      setEditingTokenPath(null);
-                                      toast.success("Token updated");
-                                    } catch (err) {
-                                      toast.error(err instanceof Error ? err.message : "Failed to save");
-                                    }
-                                  } else if (e.key === "Escape") {
-                                    setEditingTokenPath(null);
-                                  }
-                                }}
-                                autoFocus
-                              />
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={async () => {
-                                  try {
-                                    const res = await fetch(`/api/design-kits/${designKit.id}`, {
-                                      method: "PATCH",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({ path: token.path, value: editingTokenValue }),
-                                    });
-                                    if (!res.ok) throw new Error("Failed to save");
-                                    await fetchProject();
-                                    setEditingTokenPath(null);
-                                    toast.success("Token updated");
-                                  } catch (err) {
-                                    toast.error(err instanceof Error ? err.message : "Failed to save");
-                                  }
-                                }}
-                              >
-                                <Save className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => setEditingTokenPath(null)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <>
-                              <span className="text-sm font-mono">{token.displayValue}</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => {
-                                  setEditingTokenPath(token.path);
-                                  setEditingTokenValue(token.displayValue);
-                                }}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })() : (
-            <label className="cursor-pointer block">
-              <div className="w-full p-6 rounded-lg border border-dashed text-center hover:border-foreground/20 transition-colors space-y-2">
-                {uploadingDesignKit ? (
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-                ) : (
-                  <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
-                )}
-                <p className="text-sm text-muted-foreground">
-                  {uploadingDesignKit ? "Uploading..." : "Drop a .tokens.json file or click to upload"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Export from Figma using the &quot;Design Tokens (W3C)&quot; plugin
-                </p>
-              </div>
-              <input
-                type="file"
-                accept=".json,.tokens.json"
-                className="hidden"
-                disabled={uploadingDesignKit}
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setUploadingDesignKit(true);
-                  try {
-                    const text = await file.text();
-                    const res = await fetch("/api/design-kits", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        projectId: id,
-                        fileName: file.name,
-                        tokensJson: text,
-                      }),
-                    });
-                    const result = await res.json();
-                    if (!res.ok) throw new Error(result.error || "Upload failed");
-                    await fetchProject();
-                    toast.success("Design kit uploaded");
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : "Upload failed");
-                  } finally {
-                    setUploadingDesignKit(false);
-                    e.target.value = "";
-                  }
-                }}
-              />
-            </label>
-          )}
-        </CardContent>
-      </Card>
-
       {products.length > 0 && (
         <Card>
           <CardHeader>
@@ -2619,7 +2487,7 @@ export default function ProjectDetailPage({
                     className={`p-1.5 rounded-l-md transition-colors ${productView === "grid" ? "bg-muted" : "hover:bg-muted/50"}`}
                     title="Grid view"
                   >
-                    <LayoutGrid className="h-4 w-4" />
+                    <GridFour className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
@@ -2627,7 +2495,7 @@ export default function ProjectDetailPage({
                     className={`p-1.5 rounded-r-md transition-colors ${productView === "tree" ? "bg-muted" : "hover:bg-muted/50"}`}
                     title="Tree view"
                   >
-                    <ListTree className="h-4 w-4" />
+                    <TreeStructure className="h-4 w-4" />
                   </button>
                 </div>
                 <Button
@@ -2673,7 +2541,7 @@ export default function ProjectDetailPage({
                     URL.revokeObjectURL(url);
                   }}
                 >
-                  <Download className="h-4 w-4 mr-1" />
+                  <DownloadSimple className="h-4 w-4 mr-1" />
                   Export JSON
                 </Button>
               </div>
@@ -2717,7 +2585,7 @@ export default function ProjectDetailPage({
                         onClick={() => handleDeleteProduct(product.id)}
                         title="Delete product"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </div>
@@ -2749,9 +2617,9 @@ export default function ProjectDetailPage({
                           }}
                         >
                           {catExpanded ? (
-                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <CaretDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                           ) : (
-                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <CaretRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                           )}
                           <Package className="h-4 w-4 shrink-0" />
                           <span className="font-medium text-sm">{category}</span>
@@ -2784,9 +2652,9 @@ export default function ProjectDetailPage({
                                       }}
                                     >
                                       {prodExpanded ? (
-                                        <ChevronDown className="h-4 w-4" />
+                                        <CaretDown className="h-4 w-4" />
                                       ) : (
-                                        <ChevronRight className="h-4 w-4" />
+                                        <CaretRight className="h-4 w-4" />
                                       )}
                                     </button>
                                     <span className="text-sm truncate">{product.name}</span>
@@ -2806,7 +2674,7 @@ export default function ProjectDetailPage({
                                       onClick={() => handleDeleteProduct(product.id)}
                                       title="Delete product"
                                     >
-                                      <Trash2 className="h-3.5 w-3.5" />
+                                      <Trash className="h-3.5 w-3.5" />
                                     </button>
                                   </div>
                                   {prodExpanded && hasChildren && (
@@ -2829,9 +2697,9 @@ export default function ProjectDetailPage({
                                               }}
                                             >
                                               {secExpanded ? (
-                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
                                               ) : (
-                                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <CaretRight className="h-3.5 w-3.5 text-muted-foreground" />
                                               )}
                                               <span className="text-xs font-medium text-muted-foreground">Variants</span>
                                             </button>
@@ -2865,9 +2733,9 @@ export default function ProjectDetailPage({
                                               }}
                                             >
                                               {secExpanded ? (
-                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
                                               ) : (
-                                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <CaretRight className="h-3.5 w-3.5 text-muted-foreground" />
                                               )}
                                               <span className="text-xs font-medium text-muted-foreground">Specifications</span>
                                             </button>
@@ -2901,9 +2769,9 @@ export default function ProjectDetailPage({
                                               }}
                                             >
                                               {secExpanded ? (
-                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
                                               ) : (
-                                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <CaretRight className="h-3.5 w-3.5 text-muted-foreground" />
                                               )}
                                               <span className="text-xs font-medium text-muted-foreground">
                                                 Images ({product.images!.length})
@@ -2950,7 +2818,7 @@ export default function ProjectDetailPage({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5" />
+                <Sparkle className="h-5 w-5" />
                 AI Mockups
               </CardTitle>
               <CardDescription>
@@ -2963,7 +2831,7 @@ export default function ProjectDetailPage({
                 size="sm"
                 onClick={() => setShowMockupForm(true)}
               >
-                <Wand2 className="h-4 w-4 mr-2" />
+                <MagicWand className="h-4 w-4 mr-2" />
                 Generate Mockup
               </Button>
             )}
@@ -3024,7 +2892,7 @@ export default function ProjectDetailPage({
                   </div>
                 )}
                 <label className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm cursor-pointer hover:bg-muted/50 transition-colors w-fit ${mockupFormTouched && mockupRefImages.length === 0 ? "border-destructive" : ""}`}>
-                  <Upload className="h-4 w-4 text-muted-foreground" />
+                  <UploadSimple className="h-4 w-4 text-muted-foreground" />
                   <span>Upload images</span>
                   <input
                     type="file"
@@ -3053,13 +2921,13 @@ export default function ProjectDetailPage({
                 </label>
                 {mockupFormTouched && mockupRefImages.length === 0 && (
                   <p className="text-xs text-destructive flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
+                    <WarningCircle className="h-3 w-3" />
                     At least one visual reference image is required
                   </p>
                 )}
                 {mockupRefImages.length > 0 && primaryRefIndex === null && (
                   <p className="text-xs text-amber-500 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
+                    <WarningCircle className="h-3 w-3" />
                     Tip: Click the star on an image to set it as the primary reference for best results
                   </p>
                 )}
@@ -3077,7 +2945,7 @@ export default function ProjectDetailPage({
                     value={mockupStyle}
                     onChange={(e) => setMockupStyle(e.target.value)}
                     disabled={generatingPrompt}
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="flex h-9 w-full rounded-[8px] border border-input bg-background px-3 pr-8 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <option value="Modern Minimal">Modern Minimal</option>
                     <option value="Bold & Dark">Bold & Dark</option>
@@ -3096,7 +2964,7 @@ export default function ProjectDetailPage({
                     value={mockupPageType}
                     onChange={(e) => setMockupPageType(e.target.value)}
                     disabled={generatingPrompt}
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="flex h-9 w-full rounded-[8px] border border-input bg-background px-3 pr-8 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <option value="Homepage">Homepage</option>
                     <option value="Product Page">Product Page</option>
@@ -3114,7 +2982,7 @@ export default function ProjectDetailPage({
                     value={mockupAspectRatio}
                     onChange={(e) => setMockupAspectRatio(e.target.value)}
                     disabled={generatingPrompt}
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="flex h-9 w-full rounded-[8px] border border-input bg-background px-3 pr-8 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <option value="9:16">9:16 Full Page</option>
                     <option value="3:4">3:4 Portrait</option>
@@ -3219,9 +3087,9 @@ export default function ProjectDetailPage({
                   size="sm"
                 >
                   {generatingPrompt ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
-                    <Wand2 className="h-4 w-4 mr-2" />
+                    <MagicWand className="h-4 w-4 mr-2" />
                   )}
                   {generatingPrompt ? "Crafting Prompt..." : "Generate Prompt"}
                 </Button>
@@ -3276,10 +3144,10 @@ export default function ProjectDetailPage({
                     className="w-full justify-between"
                   >
                     <span className="flex items-center gap-2">
-                      <BookMarked className="h-4 w-4" />
+                      <BookmarkSimple className="h-4 w-4" />
                       Load Saved Prompt
                     </span>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${showLoadPrompt ? "rotate-180" : ""}`} />
+                    <CaretDown className={`h-4 w-4 transition-transform ${showLoadPrompt ? "rotate-180" : ""}`} />
                   </Button>
                   {showLoadPrompt && (
                     <div className="absolute z-10 mt-1 w-full rounded-md border bg-background shadow-lg max-h-64 overflow-y-auto">
@@ -3325,7 +3193,7 @@ export default function ProjectDetailPage({
                                       {sp.pageType && sp.style && <span> · </span>}
                                       {sp.style && <span>{sp.style}</span>}
                                       {(sp.pageType || sp.style) && <span> · </span>}
-                                      {new Date(sp.updatedAt).toLocaleDateString()}
+                                      {formatDateShort(sp.updatedAt)}
                                     </p>
                                   </button>
                                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -3335,7 +3203,7 @@ export default function ProjectDetailPage({
                                       onClick={(e) => { e.stopPropagation(); setRenamingPromptId(sp.id); setRenameValue(sp.name); }}
                                       title="Rename"
                                     >
-                                      <Pencil className="h-3 w-3" />
+                                      <PencilSimple className="h-3 w-3" />
                                     </button>
                                     <button
                                       type="button"
@@ -3343,7 +3211,7 @@ export default function ProjectDetailPage({
                                       onClick={(e) => { e.stopPropagation(); deleteSavedPrompt(sp.id); }}
                                       title="Delete"
                                     >
-                                      <Trash2 className="h-3 w-3" />
+                                      <Trash className="h-3 w-3" />
                                     </button>
                                   </div>
                                 </>
@@ -3368,8 +3236,7 @@ export default function ProjectDetailPage({
                                 {m.label || "Mockup"} — {m.style || "Custom"}
                               </p>
                               <p className="text-[10px] text-muted-foreground">
-                                {new Date(m.createdAt).toLocaleDateString()} at{" "}
-                                {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                {formatDate(m.createdAt)}
                               </p>
                             </button>
                           ))}
@@ -3461,7 +3328,7 @@ export default function ProjectDetailPage({
               {/* Style References (text) */}
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
-                  <Pencil className="h-4 w-4" />
+                  <PencilSimple className="h-4 w-4" />
                   Style References (optional)
                 </label>
                 <p className="text-xs text-muted-foreground">
@@ -3483,7 +3350,7 @@ export default function ProjectDetailPage({
                   disabled={!editedPrompt.trim()}
                   size="sm"
                 >
-                  <Sparkles className="h-4 w-4 mr-2" />
+                  <Sparkle className="h-4 w-4 mr-2" />
                   Generate Image
                 </Button>
                 <Button
@@ -3493,9 +3360,9 @@ export default function ProjectDetailPage({
                   disabled={generatingPrompt}
                 >
                   {generatingPrompt ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
-                    <RefreshCw className="h-4 w-4 mr-2" />
+                    <ArrowsClockwise className="h-4 w-4 mr-2" />
                   )}
                   Regenerate Prompt
                 </Button>
@@ -3545,9 +3412,9 @@ export default function ProjectDetailPage({
                         className="h-8"
                       >
                         {savingPrompt ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <SpinnerGap className="h-4 w-4 animate-spin" />
                         ) : (
-                          <Save className="h-3.5 w-3.5" />
+                          <FloppyDisk className="h-3.5 w-3.5" />
                         )}
                       </Button>
                       <Button
@@ -3567,7 +3434,7 @@ export default function ProjectDetailPage({
                       onClick={() => setShowSavePrompt(true)}
                       disabled={!editedPrompt.trim()}
                     >
-                      <BookmarkPlus className="h-4 w-4 mr-2" />
+                      <BookmarkSimple className="h-4 w-4 mr-2" />
                       Save Prompt
                     </Button>
                   )}
@@ -3579,7 +3446,7 @@ export default function ProjectDetailPage({
           {/* Generating image spinner */}
           {generatingImage && (
             <div className="flex flex-col items-center justify-center p-8 gap-3 mb-6">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <SpinnerGap className="h-8 w-8 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">Generating mockup image... This may take a moment.</p>
             </div>
           )}
@@ -3617,8 +3484,7 @@ export default function ProjectDetailPage({
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(mockup.createdAt).toLocaleDateString()} at{" "}
-                        {new Date(mockup.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {formatDate(mockup.createdAt)}
                       </p>
                     </div>
                   </button>
@@ -3641,7 +3507,7 @@ export default function ProjectDetailPage({
                       onClick={(e) => e.stopPropagation()}
                       title="Download image"
                     >
-                      <Download className="h-3.5 w-3.5" />
+                      <DownloadSimple className="h-3.5 w-3.5" />
                     </a>
                     <button
                       type="button"
@@ -3652,7 +3518,7 @@ export default function ProjectDetailPage({
                       }}
                       title="Delete mockup"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
@@ -3711,7 +3577,7 @@ export default function ProjectDetailPage({
                   onClick={(e) => e.stopPropagation()}
                   title="Download image"
                 >
-                  <Download className="h-4 w-4" />
+                  <DownloadSimple className="h-4 w-4" />
                 </a>
               </div>
 
@@ -3788,7 +3654,7 @@ export default function ProjectDetailPage({
                   }}
                   className="w-full"
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <ArrowsClockwise className="h-4 w-4 mr-2" />
                   Refine Mockup
                 </Button>
               </div>
@@ -3800,33 +3666,65 @@ export default function ProjectDetailPage({
       {pages.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Scraped Pages</CardTitle>
-            <CardDescription>
-              {pages.length} page{pages.length !== 1 ? "s" : ""} collected from
-              the website
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Scraped Pages</CardTitle>
+                <CardDescription>
+                  {pages.length} page{pages.length !== 1 ? "s" : ""} collected from
+                  the website
+                </CardDescription>
+              </div>
+              {archivedCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowArchived(!showArchived)}
+                  className="text-xs text-muted-foreground"
+                >
+                  <Archive className="h-3.5 w-3.5 mr-1.5" />
+                  {showArchived ? "Hide" : "Show"} archived ({archivedCount})
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {sortedPages.map((page) => (
+              {visiblePages.map((page) => {
+                const isArchived = page.archived === 1;
+                return (
                 <div
                   key={page.id}
-                  className="flex flex-col rounded-lg border overflow-hidden hover:border-primary/50 hover:shadow-md transition-all group"
+                  className={`flex flex-col rounded-lg border overflow-hidden transition-all group ${
+                    isArchived
+                      ? "opacity-60 border-dashed"
+                      : "hover:border-primary/50 hover:shadow-md"
+                  }`}
                 >
+                  {isArchived && (
+                    <div className="bg-muted/80 text-muted-foreground text-[10px] font-semibold tracking-widest text-center py-0.5 uppercase">
+                      Archived
+                    </div>
+                  )}
                   <Link href={`/projects/${id}/pages/${page.id}`}>
-                    {page.screenshot ? (
-                      <div className="relative aspect-video bg-muted overflow-hidden">
-                        <img
-                          src={page.screenshot}
-                          alt={`Screenshot of ${page.title || page.url}`}
-                          className="w-full h-full object-cover object-top transition-transform group-hover:scale-105"
-                        />
-                      </div>
-                    ) : (
-                      <div className="aspect-video bg-muted flex items-center justify-center">
-                        <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
-                      </div>
-                    )}
+                    <div className="relative aspect-video bg-muted overflow-hidden">
+                      {page.screenshot ? (
+                        <>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <SpinnerGap className="h-8 w-8 animate-spin text-primary" />
+                          </div>
+                          <img
+                            src={page.screenshot}
+                            alt={`Screenshot of ${page.title || page.url}`}
+                            className="relative w-full h-full object-cover object-top transition-transform group-hover:scale-105"
+                            onLoad={(e) => { (e.currentTarget.previousElementSibling as HTMLElement)?.remove(); }}
+                          />
+                        </>
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+                        </div>
+                      )}
+                    </div>
                     <div className="p-3 flex items-center justify-between">
                       <div className="flex items-center gap-3 overflow-hidden">
                         <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
@@ -3839,7 +3737,7 @@ export default function ProjectDetailPage({
                           </p>
                         </div>
                       </div>
-                      <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <ArrowSquareOut className="h-4 w-4 text-muted-foreground shrink-0" />
                     </div>
                   </Link>
                   <div className="px-3 pb-3 space-y-2">
@@ -3851,55 +3749,51 @@ export default function ProjectDetailPage({
                         <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 rounded-md px-2 py-1.5">
                           <Package className="h-3 w-3 shrink-0" />
                           <span>{pageProducts.length} product{pageProducts.length !== 1 ? "s" : ""} extracted</span>
-                          <span className="text-emerald-500 ml-auto shrink-0">{new Date(latest.updatedAt).toLocaleDateString()}</span>
+                          <span className="text-emerald-500 ml-auto shrink-0">{formatDateShort(latest.updatedAt)}</span>
                         </div>
                       );
                     })()}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-xs"
-                      disabled={extractingProducts === page.id}
-                      onClick={() => handleExtractProducts(page.id)}
-                    >
-                      {extractingProducts === page.id ? (
-                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      ) : (
-                        <ShoppingBag className="h-3.5 w-3.5 mr-1.5" />
-                      )}
-                      {extractingProducts === page.id ? "Extracting..." : products.some(p => p.pageId === page.id) ? "Re-extract Products" : "Extract Products"}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-xs"
+                        disabled={extractingProducts === page.id}
+                        onClick={() => handleExtractProducts(page.id)}
+                      >
+                        {extractingProducts === page.id ? (
+                          <SpinnerGap className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <ShoppingBag className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        {extractingProducts === page.id ? "Extracting..." : products.some(p => p.pageId === page.id) ? "Re-extract Products" : "Extract Products"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs px-2 text-muted-foreground hover:text-foreground"
+                        disabled={archivingPageId === page.id}
+                        onClick={() => handleArchivePage(page.id, isArchived ? 0 : 1)}
+                        title={isArchived ? "Restore page" : "Archive page"}
+                      >
+                        {archivingPageId === page.id ? (
+                          <SpinnerGap className="h-3.5 w-3.5 animate-spin" />
+                        ) : isArchived ? (
+                          <ArrowCounterClockwise className="h-3.5 w-3.5" />
+                        ) : (
+                          <Archive className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {analyses.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Completed Analyses</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-              {analyses.map((analysis) => (
-                <Link
-                  key={analysis.id}
-                  href={`/projects/${id}/analysis?tab=${analysis.type}`}
-                  className="p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <AnalysisIcon type={analysis.type} />
-                    <span className="font-medium capitalize">{analysis.type}</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
       </div>
     </>
   );
@@ -3934,18 +3828,41 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function AnalysisIcon({ type }: { type: string }) {
-  const icons: Record<string, React.ReactNode> = {
-    marketing: <span className="text-blue-500">M</span>,
-    techstack: <span className="text-green-500">T</span>,
-    architecture: <span className="text-purple-500">A</span>,
-    performance: <span className="text-orange-500">P</span>,
-    recommendations: <span className="text-red-500">R</span>,
+function AnalysisIcon({ type, size = "lg" }: { type: string; size?: "sm" | "lg" }) {
+  const config: Record<string, { icon: React.ReactNode; bg: string; text: string }> = {
+    marketing: {
+      icon: size === "lg" ? <ChartBar className="h-7 w-7" /> : <ChartBar className="h-4 w-4" />,
+      bg: "bg-blue-100 dark:bg-blue-900/40",
+      text: "text-blue-600 dark:text-blue-400",
+    },
+    techstack: {
+      icon: size === "lg" ? <CodeBlock className="h-7 w-7" /> : <CodeBlock className="h-4 w-4" />,
+      bg: "bg-emerald-100 dark:bg-emerald-900/40",
+      text: "text-emerald-600 dark:text-emerald-400",
+    },
+    architecture: {
+      icon: size === "lg" ? <TreeStructure className="h-7 w-7" /> : <TreeStructure className="h-4 w-4" />,
+      bg: "bg-violet-100 dark:bg-violet-900/40",
+      text: "text-violet-600 dark:text-violet-400",
+    },
+    performance: {
+      icon: size === "lg" ? <Lightning className="h-7 w-7" /> : <Lightning className="h-4 w-4" />,
+      bg: "bg-orange-100 dark:bg-orange-900/40",
+      text: "text-orange-600 dark:text-orange-400",
+    },
+    recommendations: {
+      icon: size === "lg" ? <Lightbulb className="h-7 w-7" /> : <Lightbulb className="h-4 w-4" />,
+      bg: "bg-rose-100 dark:bg-rose-900/40",
+      text: "text-rose-600 dark:text-rose-400",
+    },
   };
 
+  const c = config[type] || { icon: type[0].toUpperCase(), bg: "bg-muted", text: "text-foreground" };
+  const circleSize = size === "lg" ? "h-14 w-14" : "h-6 w-6";
+
   return (
-    <div className="h-6 w-6 rounded bg-muted flex items-center justify-center text-xs font-bold">
-      {icons[type] || type[0].toUpperCase()}
+    <div className={`${circleSize} rounded-full ${c.bg} ${c.text} flex items-center justify-center`}>
+      {c.icon}
     </div>
   );
 }
