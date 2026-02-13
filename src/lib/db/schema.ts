@@ -21,6 +21,7 @@ export const projects = sqliteTable("projects", {
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
+  contextUpdatedAt: integer("context_updated_at", { mode: "timestamp" }),
   updatedAt: integer("updated_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -40,6 +41,7 @@ export const pages = sqliteTable("pages", {
   fullPageScreenshot: text("full_page_screenshot"),
   metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
   version: integer("version").notNull().default(1),
+  archived: integer("archived").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -160,24 +162,6 @@ export const savedPrompts = sqliteTable("saved_prompts", {
 
 export type SavedPrompt = typeof savedPrompts.$inferSelect;
 export type NewSavedPrompt = typeof savedPrompts.$inferInsert;
-
-export const designKits = sqliteTable("design_kits", {
-  id: text("id").primaryKey(),
-  projectId: text("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  fileName: text("file_name").notNull(),
-  tokens: text("tokens", { mode: "json" }).$type<Record<string, unknown>>(),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
-
-export type DesignKit = typeof designKits.$inferSelect;
-export type NewDesignKit = typeof designKits.$inferInsert;
 
 export const errorLogs = sqliteTable("error_logs", {
   id: text("id").primaryKey(),

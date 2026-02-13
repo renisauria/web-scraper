@@ -29,6 +29,7 @@ export interface Project {
   logo: string | null;
   platformInfo: PlatformInfo | null;
   status: ProjectStatus;
+  contextUpdatedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +44,7 @@ export interface Page {
   fullPageScreenshot: string | null;
   metadata: Record<string, unknown> | null;
   version: number;
+  archived: number;
   createdAt: Date;
 }
 
@@ -296,22 +298,6 @@ export interface SavedPrompt {
   pageType: string | null;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface DesignKit {
-  id: string;
-  projectId: string;
-  fileName: string;
-  tokens: Record<string, unknown> | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface FlatToken {
-  path: string;
-  type: string;
-  displayValue: string;
-  rawValue: unknown;
 }
 
 export interface ProductVariant {

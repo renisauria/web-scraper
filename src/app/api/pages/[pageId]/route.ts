@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
+import { z } from "zod";
 import { scrapeSinglePage } from "@/lib/firecrawl";
+import { compressScreenshot } from "@/lib/screenshot-compress";
 import { logError } from "@/lib/error-logger";
 
 export async function GET(
@@ -103,6 +105,9 @@ export async function POST(
       createdAt: currentPage.createdAt,
     });
 
+    // Compress screenshot (handles both URLs and data URIs)
+    const compressedScreenshot = await compressScreenshot(scrapedPage.screenshot || null);
+
     // Update the page record with new version (reset full-page screenshot for new version)
     const newVersion = currentPage.version + 1;
     await db
@@ -110,7 +115,7 @@ export async function POST(
       .set({
         title: scrapedPage.title || null,
         content: scrapedPage.markdown || scrapedPage.content || null,
-        screenshot: scrapedPage.screenshot || null,
+        screenshot: compressedScreenshot,
         fullPageScreenshot: null, // Reset - user can capture new one if needed
         metadata: scrapedPage.metadata || null,
         version: newVersion,
@@ -135,6 +140,57 @@ export async function POST(
     await logError({ route: "/api/pages/[pageId]", method: "POST", error });
     return NextResponse.json(
       { error: "Failed to re-scrape page" },
+      { status: 500 }
+    );
+  }
+}
+
+const patchSchema = z.object({
+  archived: z.number().min(0).max(1),
+});
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { pageId: string } }
+) {
+  try {
+    const { pageId } = params;
+    const body = await request.json();
+    const parsed = patchSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid request", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const existing = await db
+      .select()
+      .from(schema.pages)
+      .where(eq(schema.pages.id, pageId))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return NextResponse.json({ error: "Page not found" }, { status: 404 });
+    }
+
+    await db
+      .update(schema.pages)
+      .set({ archived: parsed.data.archived })
+      .where(eq(schema.pages.id, pageId));
+
+    const updated = await db
+      .select()
+      .from(schema.pages)
+      .where(eq(schema.pages.id, pageId))
+      .limit(1);
+
+    return NextResponse.json({ page: updated[0] });
+  } catch (error) {
+    await logError({ route: "/api/pages/[pageId]", method: "PATCH", error });
+    return NextResponse.json(
+      { error: "Failed to update page" },
       { status: 500 }
     );
   }
