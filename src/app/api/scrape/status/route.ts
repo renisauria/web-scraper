@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
+
+export const dynamic = "force-dynamic";
 import { v4 as uuidv4 } from "uuid";
 import { getCrawlStatus } from "@/lib/firecrawl";
 import { detectPlatform } from "@/lib/platform-detector";

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
+
+export const dynamic = "force-dynamic";
 import { logError } from "@/lib/error-logger";
 
 export async function GET(request: NextRequest) {
