@@ -158,7 +158,6 @@ export default function ProjectDetailPage({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [selectedProductImageUrls, setSelectedProductImageUrls] = useState<string[]>([]);
-  const [showArchived, setShowArchived] = useState(false);
   const [archivingPageId, setArchivingPageId] = useState<string | null>(null);
 
   async function handleArchivePage(pageId: string, archived: number) {
@@ -938,9 +937,7 @@ export default function ProjectDetailPage({
   });
 
   const archivedCount = pages.filter((p) => p.archived === 1).length;
-  const visiblePages = showArchived
-    ? sortedPages
-    : sortedPages.filter((p) => p.archived !== 1);
+  const visiblePages = sortedPages.filter((p) => p.archived !== 1);
 
   const hasScrapedData = pages.length > 0;
   const hasAnalyses = analyses.length > 0;
@@ -2071,7 +2068,9 @@ export default function ProjectDetailPage({
                         )}
                       </Button>
                     </div>
-                    <pre className="p-6 text-sm text-foreground/90 leading-relaxed font-[family-name:var(--font-ibm-plex-mono)] font-normal whitespace-pre-wrap break-words">{activeTab.content}</pre>
+                    <div className="p-6 text-sm text-foreground/90 leading-relaxed prose prose-sm max-w-none dark:prose-invert">
+                      <MarkdownViewer key={activeTab.key} content={activeTab.content} />
+                    </div>
                   </div>
                 </div>
               );
@@ -3670,41 +3669,29 @@ export default function ProjectDetailPage({
               <div>
                 <CardTitle>Scraped Pages</CardTitle>
                 <CardDescription>
-                  {pages.length} page{pages.length !== 1 ? "s" : ""} collected from
+                  {visiblePages.length} page{visiblePages.length !== 1 ? "s" : ""} collected from
                   the website
                 </CardDescription>
               </div>
               {archivedCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowArchived(!showArchived)}
-                  className="text-xs text-muted-foreground"
+                <Link
+                  href={`/projects/${id}/archived`}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  <Archive className="h-3.5 w-3.5 mr-1.5" />
-                  {showArchived ? "Hide" : "Show"} archived ({archivedCount})
-                </Button>
+                  <Archive className="h-3.5 w-3.5" />
+                  {archivedCount} archived
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
               )}
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {visiblePages.map((page) => {
-                const isArchived = page.archived === 1;
-                return (
+              {visiblePages.map((page) => (
                 <div
                   key={page.id}
-                  className={`flex flex-col rounded-lg border overflow-hidden transition-all group ${
-                    isArchived
-                      ? "opacity-60 border-dashed"
-                      : "hover:border-primary/50 hover:shadow-md"
-                  }`}
+                  className="flex flex-col rounded-lg border overflow-hidden transition-all group hover:border-primary/50 hover:shadow-md"
                 >
-                  {isArchived && (
-                    <div className="bg-muted/80 text-muted-foreground text-[10px] font-semibold tracking-widest text-center py-0.5 uppercase">
-                      Archived
-                    </div>
-                  )}
                   <Link href={`/projects/${id}/pages/${page.id}`}>
                     <div className="relative aspect-video bg-muted overflow-hidden">
                       {page.screenshot ? (
@@ -3773,13 +3760,11 @@ export default function ProjectDetailPage({
                         size="sm"
                         className="text-xs px-2 text-muted-foreground hover:text-foreground"
                         disabled={archivingPageId === page.id}
-                        onClick={() => handleArchivePage(page.id, isArchived ? 0 : 1)}
-                        title={isArchived ? "Restore page" : "Archive page"}
+                        onClick={() => handleArchivePage(page.id, 1)}
+                        title="Archive page"
                       >
                         {archivingPageId === page.id ? (
                           <SpinnerGap className="h-3.5 w-3.5 animate-spin" />
-                        ) : isArchived ? (
-                          <ArrowCounterClockwise className="h-3.5 w-3.5" />
                         ) : (
                           <Archive className="h-3.5 w-3.5" />
                         )}
@@ -3787,8 +3772,7 @@ export default function ProjectDetailPage({
                     </div>
                   </div>
                 </div>
-                );
-              })}
+              ))}
             </div>
           </CardContent>
         </Card>
